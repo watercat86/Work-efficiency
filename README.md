@@ -5,10 +5,20 @@
   HTMLを書く作業をラクにするための、いろいろなWebエディタをぶっこみました。
 </p>
 
+## 🌐 オンラインで使う
+
+**GitHub Pages で公開中！**
+
+👉 https://watercat86.github.io/Work-efficiency/
+
+ブラウザで開くだけで、すぐに使えます。
+
 ## 🎮 ツール
 
 ### Parts Rig Editor
 **キャラクターのスプライトを図形で組み立てるエディタ**
+
+👉 https://watercat86.github.io/Work-efficiency/parts-rig-editor/
 
 - 四角形・円・三角形・多角形などの図形でキャラクターを設計
 - 関節(基準点)を設定して、親子関係で骨組みを作成
@@ -21,6 +31,8 @@
 
 ### Sonic Forge
 **ビジュアル編集でゲーム音・BGMを作成するDAW**
+
+👉 https://watercat86.github.io/Work-efficiency/sonic-forge/
 
 - 複数のトラック(wave形状, ノイズなど)で音を重ねられる
 - ピアノロール風UIでノートを置いて作曲
@@ -35,10 +47,16 @@
 
 ```
 Work-efficiency/
-├── index (9).html          # ポータルサイト(このツール箱の玄関)
-├── parts_rig_editor (2).html  # スプライトエディタ
-├── sonic_forge.html        # 音楽・効果音エディタ
-└── README.md              # このファイル
+├── index.html                    # ポータルサイト（玄関）
+├── parts-rig-editor/
+│   └── index.html               # Parts Rig Editor
+├── sonic-forge/
+│   └── index.html               # Sonic Forge
+├── _config.yml                   # GitHub Pages設定
+├── .github/
+│   └── workflows/
+│       └── deploy.yml           # 自動デプロイワークフロー
+└── README.md                     # このファイル
 ```
 
 ## 🚀 始め方
@@ -51,12 +69,19 @@ git clone https://github.com/watercat86/Work-efficiency.git
 # フォルダを開く
 cd Work-efficiency
 
-# index (9).html をブラウザで開く
+# index.html をブラウザで開く
 # (例: ドラッグ＆ドロップ、またはダブルクリック)
 ```
 
-### オンラインで使う
-GitHub Pagesで公開する予定(準備中)
+### サーバーで開く（推奨）
+```bash
+# Python 3
+python -m http.server 8000
+
+# または Node.js
+npx http-server
+```
+その後、ブラウザで `http://localhost:8000` を開く
 
 ## 💡 使用例
 
@@ -81,23 +106,9 @@ GitHub Pagesで公開する予定(準備中)
 
 ## 🛠️ 技術スタック
 
-- **言語:** HTML + CSS + JavaScript (React + Tailwind CSS)
-- **フレームワーク:** React 18
-- **スタイリング:** Tailwind CSS
-- **その他:** JSX (Babel Standalone で変換)
-
-### 外部CDN
-```html
-<!-- React -->
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-
-<!-- Tailwind CSS -->
-<script src="https://cdn.tailwindcss.com"></script>
-
-<!-- JSX 変換 -->
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-```
+- **言語:** HTML + CSS + JavaScript
+- **ホスティング:** GitHub Pages
+- **CI/CD:** GitHub Actions
 
 ## ✨ 機能一覧
 
@@ -128,7 +139,7 @@ GitHub Pagesで公開する予定(準備中)
 
 ## 🎯 今後やりたいこと
 
-- [ ] オンライン公開(GitHub Pages)
+- [x] オンライン公開(GitHub Pages)
 - [ ] Parts Rigger: ゲーム用ランタイムの充実
 - [ ] Sonic Forge: MIDIファイル読み込み
 - [ ] 複数のサンプルキャラ・BGM集
