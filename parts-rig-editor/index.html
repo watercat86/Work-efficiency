@@ -1,86 +1,1271 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Parts Rig Editor - HTML Workbench</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
-<style>
-:root{
-  --bg:#e8eee9; --panel:#f6f9f6; --ink:#17302c; --sub:#5b706b;
-  --line:#17302c; --accent:#2b55ff; --mark:#ffd84a;
-  --disp:"Dela Gothic One","Zen Kaku Gothic New",sans-serif;
-  --body:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
-}
-@media (prefers-color-scheme:dark){
-  :root{--bg:#10201d; --panel:#172b27; --ink:#e6f0ea; --sub:#93aaa3; --line:#e6f0ea; --accent:#8aa2ff;}
-}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body)}
-header{padding:1.5rem;border-bottom:2px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:1rem}
-h1{margin:0;font-family:var(--disp);font-size:1.5rem}
-header a{color:var(--accent);text-decoration:none}
-header a:hover{text-decoration:underline}
-main{max-width:1200px;margin:0 auto;padding:2rem 1rem}
-.section{margin-bottom:2rem;padding:1.5rem;background:var(--panel);border:2px solid var(--line);border-radius:8px}
-.section h2{margin:0 0 1rem;font-family:var(--disp);font-size:1.25rem}
-.info{background:rgba(43,85,255,0.1);padding:1rem;border-left:4px solid var(--accent);margin-bottom:1rem;border-radius:4px}
-footer{text-align:center;padding:2rem 1rem;color:var(--sub);font-size:0.85rem;border-top:2px solid var(--line);margin-top:2rem}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Parts Rig Editor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body { margin: 0; padding: 0; overflow: hidden; overscroll-behavior: none; }
+    .no-select { user-select: none; -webkit-user-select: none; }
+    input[type=number]::-webkit-inner-spin-button { opacity: .4; }
+    .scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+    .scroll-thin::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+  </style>
 </head>
-<body>
-<header>
-  <h1>🎮 Parts Rig Editor</h1>
-  <a href="../">← ポータルに戻る</a>
-</header>
+<body class="bg-slate-950">
+  <div id="root"></div>
 
-<main>
-  <div class="info">
-    <strong>ℹ️ このページはサブディレクトリ版です</strong> - ここでツールを開くか、ポータルから戻ってください。
-  </div>
+  <script type="text/babel">
+    const { useState, useRef, useEffect, useCallback, useMemo } = React;
 
-  <div class="section">
-    <h2>Parts Rig Editor について</h2>
-    <p>キャラクターのスプライトを図形で組み立てるエディタです。</p>
-    <ul>
-      <li>四角形・円・三角形・多角形などの図形でキャラクターを設計</li>
-      <li>関節(基準点)を設定して、親子関係で骨組みを作成</li>
-      <li>AIに「右腕を振るコード」を頼めるようにJSON書き出し対応</li>
-      <li>ゲーム用のスタンドアロンHTMLも自動生成</li>
-    </ul>
-  </div>
+    /* =====================================================
+       アイコン
+       ===================================================== */
+    const Ic = ({ children, size = 18 }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{children}</svg>
+    );
+    const ICONS = {
+      select: <Ic><path d="M5 3l14 8-6 2-2 6z"/></Ic>,
+      rect: <Ic><rect x="3" y="4" width="18" height="16" rx="2"/></Ic>,
+      ellipse: <Ic><circle cx="12" cy="12" r="9"/></Ic>,
+      triangle: <Ic><polygon points="12 3 22 20 2 20"/></Ic>,
+      polygon: <Ic><polygon points="12 2 21 9 18 20 6 20 3 9"/></Ic>,
+      line: <Ic><line x1="4" y1="20" x2="20" y2="4"/></Ic>,
+      star: <Ic><polygon points="12 2 15 9 22 9.5 16.5 14 18.5 21 12 17 5.5 21 7.5 14 2 9.5 9 9"/></Ic>,
+      semicircle: <Ic><path d="M3 15a9 9 0 0 1 18 0z"/></Ic>,
+      arc: <Ic><path d="M4 18a9 9 0 0 1 16 0"/></Ic>,
+      free: <Ic><path d="M4 18 L8 6 L15 12 L20 4"/><circle cx="4" cy="18" r="1.5"/><circle cx="8" cy="6" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="20" cy="4" r="1.5"/></Ic>,
+      group: <Ic><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/><path d="M11 7h4a2 2 0 0 1 2 2v4"/></Ic>,
+      ungroup: <Ic><rect x="2" y="2" width="8" height="8" rx="1"/><rect x="14" y="14" width="8" height="8" rx="1"/></Ic>,
+      trash: <Ic><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></Ic>,
+      up: <Ic><polyline points="18 15 12 9 6 15"/></Ic>,
+      down: <Ic><polyline points="6 9 12 15 18 9"/></Ic>,
+      copy: <Ic><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></Ic>,
+      undo: <Ic><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></Ic>,
+      redo: <Ic><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></Ic>,
+      code: <Ic><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></Ic>,
+      check: <Ic><polyline points="20 6 9 17 4 12"/></Ic>,
+      chevR: <Ic size={14}><polyline points="9 18 15 12 9 6"/></Ic>,
+      chevD: <Ic size={14}><polyline points="6 9 12 15 18 9"/></Ic>,
+      eye: <Ic size={15}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></Ic>,
+      eyeOff: <Ic size={15}><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></Ic>,
+      pivot: <Ic><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="22"/><line x1="2" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="22" y2="12"/></Ic>,
+      upload: <Ic><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></Ic>,
+      download: <Ic><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Ic>,
+      play: <Ic><polygon points="6 3 20 12 6 21"/></Ic>,
+    };
 
-  <div class="section">
-    <h2>使い方</h2>
-    <ol>
-      <li>キャンバスに図形を置く</li>
-      <li>親子関係を作る</li>
-      <li>roleを付けて意味を設定</li>
-      <li>JSONを書き出してAIに渡す</li>
-    </ol>
-  </div>
+    /* =====================================================
+       定数
+       ===================================================== */
+    const SHAPE_LABEL = {
+      rect: '四角形', ellipse: '円・楕円', triangle: '三角形', polygon: '多角形',
+      line: '線', star: '星', semicircle: '半円', arc: '円弧', free: '自由変形', group: 'グループ',
+    };
+    const TOOLS = ['select', 'rect', 'ellipse', 'triangle', 'polygon', 'line', 'star', 'semicircle', 'arc', 'free'];
 
-  <div class="section">
-    <h2>機能</h2>
-    <ul>
-      <li>✅ 図形描画(四角・円・三角形・多角形・星・半円・円弧・自由形)</li>
-      <li>✅ グループ化(見えない親パーツで関節を作成)</li>
-      <li>✅ 親子付け替え(ドラッグで階層変更)</li>
-      <li>✅ 基準点編集(回転・スケールの軸を設定)</li>
-      <li>✅ 頂点編集(三角形・自由形の頂点を直接変更)</li>
-      <li>✅ JSON書き出し＆読み込み</li>
-      <li>✅ ゲーム用HTMLスタンドアロン生成</li>
-      <li>✅ ズーム＆パン操作</li>
-      <li>✅ Undo/Redo</li>
-    </ul>
-  </div>
-</main>
+    /* パーツの「意味」プリセット。AIが役割を理解する手がかりになる */
+    const ROLE_PRESETS = [
+      { group: '体', items: ['head', 'neck', 'torso', 'hip', 'tail', 'wing_l', 'wing_r'] },
+      { group: '腕', items: ['arm_r', 'arm_l', 'forearm_r', 'forearm_l', 'hand_r', 'hand_l'] },
+      { group: '脚', items: ['leg_r', 'leg_l', 'shin_r', 'shin_l', 'foot_r', 'foot_l'] },
+      { group: '顔', items: ['eye_r', 'eye_l', 'pupil_r', 'pupil_l', 'brow_r', 'brow_l', 'nose', 'mouth', 'ear_r', 'ear_l', 'hair'] },
+      { group: '持ち物・その他', items: ['weapon', 'shield', 'accessory', 'effect', 'shadow', 'background'] },
+    ];
 
-<footer>
-  © <span id="year"></span> watercat86 / <a href="https://github.com/watercat86/Work-efficiency">GitHub</a>
-  <script>document.getElementById("year").textContent = new Date().getFullYear();</script>
-</footer>
+    const PIVOT_PRESETS = [
+      ['左上', -1, -1], ['上', 0, -1], ['右上', 1, -1],
+      ['左', -1, 0], ['中心', 0, 0], ['右', 1, 0],
+      ['左下', -1, 1], ['下', 0, 1], ['右下', 1, 1],
+    ];
+
+    const uid = () => 'p_' + Math.random().toString(36).slice(2, 9);
+    const deg2rad = (d) => (d * Math.PI) / 180;
+    const clone = (v) => JSON.parse(JSON.stringify(v));
+
+    /* =====================================================
+       図形ジオメトリ
+       ・すべてのパーツは「ローカル座標(中心が原点)」で幅w×高さhの箱に収まる
+       ・pivot は中心からのオフセット。回転/スケールの軸であり、親から見た位置(x,y)の基準点でもある
+       ===================================================== */
+    const defaultShape = (type) => {
+      const base = { type, w: 100, h: 100, fill: '#cbd5e1', stroke: '#0f172a', strokeWidth: 0, opacity: 1 };
+      switch (type) {
+        case 'triangle': return { ...base, points: [[0, -0.5], [0.5, 0.5], [-0.5, 0.5]] };
+        case 'polygon': return { ...base, sides: 6 };
+        case 'star': return { ...base, points: 5, innerRatio: 0.45 };
+        case 'semicircle': return { ...base, h: 50, w: 100 };
+        case 'arc': return { ...base, fill: 'none', stroke: '#cbd5e1', strokeWidth: 8, startAngle: 200, endAngle: 340 };
+        case 'line': return { ...base, w: 120, h: 0, fill: 'none', stroke: '#cbd5e1', strokeWidth: 6, lineCap: 'round' };
+        case 'free': return { ...base, closed: true, points: [[-0.5, 0.3], [-0.2, -0.5], [0.4, -0.4], [0.5, 0.4], [0, 0.5]] };
+        default: return base;
+      }
+    };
+
+    /* 正規化座標(-0.5〜0.5)の点をw,hにスケール */
+    const scalePts = (pts, w, h) => pts.map(([x, y]) => [x * w, y * h]);
+
+    const polygonPoints = (sides, w, h) => {
+      const pts = [];
+      for (let i = 0; i < sides; i++) {
+        const a = -Math.PI / 2 + (i * 2 * Math.PI) / sides;
+        pts.push([Math.cos(a) * w / 2, Math.sin(a) * h / 2]);
+      }
+      return pts;
+    };
+
+    const starPoints = (n, ratio, w, h) => {
+      const pts = [];
+      for (let i = 0; i < n * 2; i++) {
+        const r = i % 2 === 0 ? 1 : ratio;
+        const a = -Math.PI / 2 + (i * Math.PI) / n;
+        pts.push([Math.cos(a) * r * w / 2, Math.sin(a) * r * h / 2]);
+      }
+      return pts;
+    };
+
+    const ptsToStr = (pts) => pts.map(p => p.join(',')).join(' ');
+    const ptsToPath = (pts, closed) => 'M' + pts.map(p => p.join(' ')).join(' L') + (closed ? ' Z' : '');
+
+    const arcPath = (w, h, s, e) => {
+      const rx = w / 2, ry = h / 2;
+      let sweep = ((e - s) % 360 + 360) % 360;
+      if (sweep === 0) sweep = 360;
+      if (sweep >= 359.99) {
+        return `M ${rx} 0 A ${rx} ${ry} 0 1 1 ${-rx} 0 A ${rx} ${ry} 0 1 1 ${rx} 0`;
+      }
+      const sx = Math.cos(deg2rad(s)) * rx, sy = Math.sin(deg2rad(s)) * ry;
+      const ex = Math.cos(deg2rad(e)) * rx, ey = Math.sin(deg2rad(e)) * ry;
+      const large = sweep > 180 ? 1 : 0;
+      return `M ${sx} ${sy} A ${rx} ${ry} 0 ${large} 1 ${ex} ${ey}`;
+    };
+
+    /* 描画用の「頂点リスト」を返す(頂点編集できる形状のみ) */
+    const editablePoints = (p) => {
+      if (p.type === 'triangle' || p.type === 'free') return scalePts(p.points, p.w, p.h);
+      return null;
+    };
+
+    /* 形状SVG要素(React) */
+    const ShapeBody = ({ p }) => {
+      const common = {
+        fill: p.fill, stroke: p.strokeWidth > 0 ? p.stroke : 'none', strokeWidth: p.strokeWidth,
+        strokeLinejoin: 'round', strokeLinecap: p.lineCap || 'round', opacity: p.opacity,
+      };
+      switch (p.type) {
+        case 'rect': return <rect x={-p.w / 2} y={-p.h / 2} width={p.w} height={p.h} rx={p.radius || 0} {...common} />;
+        case 'ellipse': return <ellipse cx="0" cy="0" rx={p.w / 2} ry={p.h / 2} {...common} />;
+        case 'triangle': return <polygon points={ptsToStr(scalePts(p.points, p.w, p.h))} {...common} />;
+        case 'polygon': return <polygon points={ptsToStr(polygonPoints(p.sides, p.w, p.h))} {...common} />;
+        case 'star': return <polygon points={ptsToStr(starPoints(p.points, p.innerRatio, p.w, p.h))} {...common} />;
+        case 'semicircle': {
+          const rx = p.w / 2, ry = p.h;
+          /* 半円は「上半分」。中心は箱の中心に合わせる */
+          return <path d={`M ${-rx} ${p.h / 2} A ${rx} ${ry} 0 0 1 ${rx} ${p.h / 2} Z`} {...common} />;
+        }
+        case 'arc': return <path d={arcPath(p.w, p.h, p.startAngle, p.endAngle)} {...common} fill="none" stroke={p.stroke} strokeWidth={p.strokeWidth || 4} />;
+        case 'line': return <line x1={-p.w / 2} y1="0" x2={p.w / 2} y2="0" stroke={p.stroke} strokeWidth={p.strokeWidth || 4} strokeLinecap={p.lineCap || 'round'} opacity={p.opacity} />;
+        case 'free': {
+          const pts = scalePts(p.points, p.w, p.h);
+          return p.closed
+            ? <polygon points={ptsToStr(pts)} {...common} />
+            : <path d={ptsToPath(pts, false)} {...common} fill="none" stroke={p.stroke} strokeWidth={p.strokeWidth || 4} />;
+        }
+        default: return null;
+      }
+    };
+
+    /* =====================================================
+       ツリー操作ユーティリティ
+       ===================================================== */
+    const findNode = (nodes, id) => {
+      for (const n of nodes) {
+        if (n.id === id) return n;
+        if (n.children) { const r = findNode(n.children, id); if (r) return r; }
+      }
+      return null;
+    };
+    const mapTree = (nodes, fn) => nodes.map(n => {
+      const r = fn(n);
+      return r.children ? { ...r, children: mapTree(r.children, fn) } : r;
+    });
+    const updateNode = (nodes, id, patch) => mapTree(nodes, n => n.id === id ? { ...n, ...(typeof patch === 'function' ? patch(n) : patch) } : n);
+    const removeNodes = (nodes, ids) => nodes.filter(n => !ids.includes(n.id)).map(n => n.children ? { ...n, children: removeNodes(n.children, ids) } : n);
+    const findParent = (nodes, id, parent = null) => {
+      for (const n of nodes) {
+        if (n.id === id) return parent;
+        if (n.children) { const r = findParent(n.children, id, n); if (r !== undefined && r !== null) return r; }
+      }
+      return null;
+    };
+    const isDescendant = (node, id) => (node.children || []).some(c => c.id === id || isDescendant(c, id));
+    const flatten = (nodes, depth = 0, out = []) => {
+      nodes.forEach(n => { out.push({ node: n, depth }); if (n.children) flatten(n.children, depth + 1, out); });
+      return out;
+    };
+    const reId = (n) => ({ ...n, id: uid(), children: n.children ? n.children.map(reId) : undefined });
+
+    /* --- 座標変換 ---
+       ノードの変換: 親空間 → translate(x,y) → rotate → scale → translate(-pivot) → ローカル空間
+       (x,y)は「pivotが親空間のどこに来るか」を表す。 */
+    const nodeMatrix = (n) => {
+      const r = deg2rad(n.rotation || 0);
+      const sx = n.scaleX ?? 1, sy = n.scaleY ?? 1;
+      const c = Math.cos(r), s = Math.sin(r);
+      const px = n.pivot?.x || 0, py = n.pivot?.y || 0;
+      /* M = T(x,y) * R * S * T(-px,-py) */
+      const a = c * sx, b = s * sx, cc = -s * sy, d = c * sy;
+      const e = n.x - (a * px + cc * py);
+      const f = n.y - (b * px + d * py);
+      return [a, b, cc, d, e, f];
+    };
+    const mul = (m1, m2) => [
+      m1[0] * m2[0] + m1[2] * m2[1], m1[1] * m2[0] + m1[3] * m2[1],
+      m1[0] * m2[2] + m1[2] * m2[3], m1[1] * m2[2] + m1[3] * m2[3],
+      m1[0] * m2[4] + m1[2] * m2[5] + m1[4], m1[1] * m2[4] + m1[3] * m2[5] + m1[5],
+    ];
+    const inv = (m) => {
+      const det = m[0] * m[3] - m[1] * m[2] || 1e-9;
+      const a = m[3] / det, b = -m[1] / det, c = -m[2] / det, d = m[0] / det;
+      return [a, b, c, d, -(a * m[4] + c * m[5]), -(b * m[4] + d * m[5])];
+    };
+    const apply = (m, x, y) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
+    const IDENT = [1, 0, 0, 1, 0, 0];
+    const matStr = (m) => `matrix(${m.join(',')})`;
+
+    /* ルートからノードまでの「ワールド行列」を求める */
+    const worldMatrixOf = (nodes, id, acc = IDENT) => {
+      for (const n of nodes) {
+        const m = mul(acc, nodeMatrix(n));
+        if (n.id === id) return m;
+        if (n.children) { const r = worldMatrixOf(n.children, id, m); if (r) return r; }
+      }
+      return null;
+    };
+    /* 親のワールド行列(ルート直下ならIDENT) */
+    const parentMatrixOf = (nodes, id) => {
+      const parent = findParent(nodes, id);
+      if (!parent) return IDENT;
+      return worldMatrixOf(nodes, parent.id) || IDENT;
+    };
+
+    /* =====================================================
+       ランタイム(ゲーム用にエクスポートする小さな描画コード)
+       ===================================================== */
+    const RUNTIME_SRC = `/* ===== Parts Rig Runtime (依存なし・約40行) =====
+   使い方:
+     const rig = createRig(RIG_JSON, document.getElementById('stage'));
+     rig.set('arm_r', { rotation: -40 });   // roleまたはidで指定
+     rig.get('head');                       // 現在の値を取得
+   ※ x,y は「基準点(pivot)が親のどこに来るか」。rotation/scaleは基準点を軸に働く */
+function createRig(data, host) {
+  const NS = 'http://www.w3.org/2000/svg', byKey = {}, root = document.createElementNS(NS, 'svg');
+  root.setAttribute('viewBox', '0 0 ' + data.canvas.width + ' ' + data.canvas.height);
+  root.style.width = '100%'; root.style.height = '100%';
+  const el = (t, a) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); return e; };
+  const pts = (a, w, h) => a.map(p => (p[0] * w) + ',' + (p[1] * h)).join(' ');
+  const body = (p) => {
+    const s = p.shape, st = { fill: s.fill, stroke: s.strokeWidth ? s.stroke : 'none', 'stroke-width': s.strokeWidth || 0, opacity: s.opacity, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' };
+    if (s.type === 'rect') return el('rect', { x: -s.w/2, y: -s.h/2, width: s.w, height: s.h, rx: s.radius || 0, ...st });
+    if (s.type === 'ellipse') return el('ellipse', { rx: s.w/2, ry: s.h/2, ...st });
+    if (s.type === 'triangle') return el('polygon', { points: pts(s.points, s.w, s.h), ...st });
+    if (s.type === 'polygon' || s.type === 'star') {
+      const n = s.type === 'star' ? s.points * 2 : s.sides, q = [];
+      for (let i = 0; i < n; i++) { const r = s.type === 'star' ? (i % 2 ? s.innerRatio : 1) : 1, a = -Math.PI/2 + i * 2 * Math.PI / n; q.push([Math.cos(a) * r * s.w/2, Math.sin(a) * r * s.h/2]); }
+      return el('polygon', { points: q.join(' '), ...st });
+    }
+    if (s.type === 'semicircle') return el('path', { d: 'M' + (-s.w/2) + ' ' + (s.h/2) + ' A' + (s.w/2) + ' ' + s.h + ' 0 0 1 ' + (s.w/2) + ' ' + (s.h/2) + 'Z', ...st });
+    if (s.type === 'arc') {
+      const rx = s.w/2, ry = s.h/2, r = Math.PI/180, sw = (((s.endAngle - s.startAngle) % 360) + 360) % 360 || 360;
+      const d = sw >= 359.99 ? 'M' + rx + ' 0A' + rx + ' ' + ry + ' 0 1 1 ' + (-rx) + ' 0A' + rx + ' ' + ry + ' 0 1 1 ' + rx + ' 0'
+        : 'M' + (Math.cos(s.startAngle*r)*rx) + ' ' + (Math.sin(s.startAngle*r)*ry) + 'A' + rx + ' ' + ry + ' 0 ' + (sw > 180 ? 1 : 0) + ' 1 ' + (Math.cos(s.endAngle*r)*rx) + ' ' + (Math.sin(s.endAngle*r)*ry);
+      return el('path', { d, ...st, fill: 'none', stroke: s.stroke, 'stroke-width': s.strokeWidth || 4 });
+    }
+    if (s.type === 'line') return el('line', { x1: -s.w/2, y1: 0, x2: s.w/2, y2: 0, stroke: s.stroke, 'stroke-width': s.strokeWidth || 4, 'stroke-linecap': 'round', opacity: s.opacity });
+    if (s.type === 'free') return s.closed ? el('polygon', { points: pts(s.points, s.w, s.h), ...st })
+      : el('polyline', { points: pts(s.points, s.w, s.h), ...st, fill: 'none', stroke: s.stroke, 'stroke-width': s.strokeWidth || 4 });
+  };
+  const apply = (p) => { const n = p._el; n.setAttribute('transform',
+    'translate(' + p.x + ',' + p.y + ') rotate(' + p.rotation + ') scale(' + p.scaleX + ',' + p.scaleY + ') translate(' + (-p.pivot.x) + ',' + (-p.pivot.y) + ')');
+    n.style.display = p.visible === false ? 'none' : ''; };
+  const build = (p, parentEl) => {
+    const g = el('g', {}); p._el = g; byKey[p.id] = p; if (p.role) (byKey[p.role] = byKey[p.role] || p);
+    if (p.shape) g.appendChild(body(p));
+    (p.children || []).forEach(c => build(c, g));
+    apply(p); parentEl.appendChild(g);
+  };
+  data.parts.forEach(p => build(p, root)); host.appendChild(root);
+  return { root, parts: byKey,
+    get: (k) => byKey[k],
+    set: (k, v) => { const p = byKey[k]; if (!p) return; Object.assign(p, v); apply(p); } };
+}`;
+
+    /* =====================================================
+       サンプル: 最初から入っているキャラクター(親子・基準点・役割つき)
+       ===================================================== */
+    const makeSample = () => {
+      const P = (name, role, x, y, shape, extra = {}) => ({
+        id: uid(), name, role, tags: [], x, y, rotation: 0, scaleX: 1, scaleY: 1,
+        pivot: { x: 0, y: 0 }, visible: true, shape, children: [], ...extra,
+      });
+      const S = (type, over) => ({ ...defaultShape(type), ...over });
+      const skin = '#ffd3b8', blue = '#3b82f6', dark = '#0f172a', pants = '#475569', hairC = '#7c3aed';
+
+      /* 胴体(幅90×高さ130)が根っこ。子の座標の原点は「胴体の図形中心」。胴体の上端は y=-65、下端は y=+65 */
+      const torso = P('胴体', 'torso', 400, 300, S('rect', { w: 90, h: 130, fill: blue, radius: 14 }));
+
+      /* 頭: 首の位置(胴体の上端 y=-65)を基準点にする → 頭を回すと首でうなずく */
+      const head = P('頭', 'head', 0, -65, S('ellipse', { w: 96, h: 92, fill: skin }), { pivot: { x: 0, y: 46 } });
+      /* 顔パーツの座標の原点は「頭の図形中心」(頭のpivot=首ではない)。y=2 なら頭の中心のすぐ下 */
+      head.children = [
+        P('髪', 'hair', 0, -20, S('semicircle', { w: 100, h: 46, fill: hairC })),
+        P('右目', 'eye_r', 20, 2, S('ellipse', { w: 12, h: 16, fill: dark })),
+        P('左目', 'eye_l', -20, 2, S('ellipse', { w: 12, h: 16, fill: dark })),
+        P('口', 'mouth', 0, 20, S('arc', { w: 28, h: 18, stroke: dark, strokeWidth: 4, startAngle: 20, endAngle: 160 })),
+      ];
+
+      /* 腕: 肩(胴体の左右上部)を基準点にする。図形の上端が肩。 */
+      const arm = (name, role, sx) => {
+        const a = P(name, role, sx, -55, S('rect', { w: 22, h: 70, fill: skin, radius: 10 }), { pivot: { x: 0, y: -28 } });
+        a.children = [P(role.startsWith('arm_r') ? '右手' : '左手', role.replace('arm', 'hand'), 0, 40, S('ellipse', { w: 24, h: 24, fill: skin }))];
+        return a;
+      };
+      const armR = arm('右腕', 'arm_r', 56);
+      const armL = arm('左腕', 'arm_l', -56);
+
+      /* 脚: 腰(胴体の下端 y=65)を基準点にする。図形の上端が腰。 */
+      const leg = (name, role, sx) => P(name, role, sx, 65, S('rect', { w: 30, h: 80, fill: pants, radius: 8 }), { pivot: { x: 0, y: -40 } });
+      const legR = leg('右脚', 'leg_r', 22);
+      const legL = leg('左脚', 'leg_l', -22);
+
+      /* 描画順: 後ろにあるものを先に。脚 → 腕 → 頭 */
+      torso.children = [legL, legR, armL, armR, head];
+      return [torso];
+    };
+
+    /* =====================================================
+       JSONの書き出し・読み込み
+       AIに渡して「右腕を振る」「表情を変える」を頼むための構造化データ
+       ===================================================== */
+    const r1 = (v) => Math.round(v * 10) / 10;
+
+    const exportPart = (n, parentId) => {
+      const out = { id: n.id, name: n.name };
+      if (n.role) out.role = n.role;
+      if (n.tags?.length) out.tags = n.tags;
+      out.parent = parentId || null;
+      out.x = r1(n.x); out.y = r1(n.y);
+      out.pivot = { x: r1(n.pivot?.x || 0), y: r1(n.pivot?.y || 0) };
+      out.rotation = r1(n.rotation || 0);
+      out.scaleX = r1(n.scaleX ?? 1); out.scaleY = r1(n.scaleY ?? 1);
+      if (n.visible === false) out.visible = false;
+      if (n.shape) {
+        const s = { ...n.shape };
+        ['w', 'h', 'strokeWidth', 'innerRatio', 'startAngle', 'endAngle', 'radius'].forEach(k => { if (typeof s[k] === 'number') s[k] = r1(s[k]); });
+        if (s.points && Array.isArray(s.points[0])) s.points = s.points.map(p => [Math.round(p[0] * 1000) / 1000, Math.round(p[1] * 1000) / 1000]);
+        out.shape = s;
+      }
+      if (n.children?.length) out.children = n.children.map(c => exportPart(c, n.id));
+      return out;
+    };
+
+    const buildExport = (parts, canvas) => ({
+      format: 'parts-rig/1',
+      canvas,
+      notes: [
+        '【座標の原点】子パーツの x,y,pivot の原点は「親の図形の中心」。親の基準点(pivot)ではない。親がいない場合はキャンバス左上が原点。',
+        'shape.w / shape.h は図形の大きさ。図形は自分の中心が(0,0)で、幅w×高さhの箱に収まる。',
+        'x,y は「自分の基準点(pivot)が、親の図形中心から見てどこに来るか」。',
+        'pivot は自分の図形中心からのオフセット。回転とスケールはこの点を軸に行う。肩・ひじ・首などに置く。',
+        '例: pivot={x:0,y:46} の頭は、図形の中心より46下(=首)が回転の軸になる。',
+        'rotation は度(時計回りが正)。親を回すと子も一緒に動く。',
+        'role は意味(head, arm_r など)。プログラムからは rig.get(role) で取得できる。',
+        'points(三角形・自由変形)は幅w・高さhに対する比率(-0.5〜0.5)で、図形中心が原点。',
+        '【図形の向き】semicircle(半円)は「上半分」。平らな辺が箱の下端(y=+h/2)、丸みが上向き。原点は箱の中心(平らな辺の中央ではない)。',
+        '【図形の向き】arc(円弧)の角度は度。0°=右(3時)、90°=下(6時)、時計回りが正。startAngleからendAngleへ時計回りに描く。',
+        '【向きを変えたいとき】shape.w と shape.h は必ず正の数。上下や左右を反転したい場合は scaleY / scaleX に -1 を入れる(wやhを負にしない)。',
+      ],
+      parts: parts.map(p => exportPart(p, null)),
+    });
+
+    /* 読み込み: エクスポート形式 → 内部形式 */
+    const importPart = (p) => ({
+      id: p.id || uid(), name: p.name || 'パーツ', role: p.role || '', tags: p.tags || [],
+      x: p.x || 0, y: p.y || 0, rotation: p.rotation || 0,
+      scaleX: p.scaleX ?? 1, scaleY: p.scaleY ?? 1,
+      pivot: { x: p.pivot?.x || 0, y: p.pivot?.y || 0 },
+      visible: p.visible !== false,
+      shape: p.shape ? { ...defaultShape(p.shape.type), ...p.shape } : undefined,
+      children: (p.children || []).map(importPart),
+    });
+
+    /* 内部形式ではグループも図形も同じ「パーツ」。shape が無ければグループ(見えない親) */
+    const normalizeTree = (nodes) => nodes.map(n => ({ ...n, children: normalizeTree(n.children || []) }));
+
+    /* 数値入力欄。Editorの外で定義すること(中だと再描画のたびに作り直されてフォーカスが外れる)。
+       空欄・途中入力を許し、確定(フォーカスを外す/Enter)まで親へ反映しない。 */
+    function NumField({ label, value, onChange, step = 1, disabled }) {
+      const shown = Number.isFinite(value) ? String(Math.round(value * 100) / 100) : '0';
+      const [text, setText] = useState(shown);
+      const [editing, setEditing] = useState(false);
+      useEffect(() => { if (!editing) setText(shown); }, [shown, editing]);
+      const commitText = () => {
+        setEditing(false);
+        const v = parseFloat(text);
+        if (Number.isFinite(v)) onChange(v); else setText(shown);
+      };
+      return (
+        <label className="block">
+          <span className="block text-[11px] text-slate-400 mb-0.5">{label}</span>
+          <input type="number" step={step} disabled={disabled} value={editing ? text : shown}
+            onFocus={(e) => { setEditing(true); setText(shown); e.target.select(); }}
+            onChange={(e) => { setText(e.target.value); const v = parseFloat(e.target.value); if (Number.isFinite(v)) onChange(v); }}
+            onBlur={commitText}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); e.stopPropagation(); }}
+            className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-sm disabled:opacity-40 focus:outline-none focus:border-indigo-500" />
+        </label>
+      );
+    }
+
+    /* =====================================================
+       メインエディタ
+       ===================================================== */
+    const CANVAS = { width: 800, height: 600 };
+
+    function Editor() {
+      /* ---------- 状態 ---------- */
+      const [hist, setHist] = useState({ past: [], present: makeSample(), future: [] });
+      const parts = hist.present;
+      const [selId, setSelId] = useState(null);
+      const [tool, setTool] = useState('select');
+      const [expanded, setExpanded] = useState({});
+      const [modal, setModal] = useState(null); // 'export' | 'import' | 'runtime'
+      const [copied, setCopied] = useState('');
+      const [importText, setImportText] = useState('');
+      const [importErr, setImportErr] = useState('');
+      const [showPivots, setShowPivots] = useState(true);
+      const [vertexEdit, setVertexEdit] = useState(false);
+      const [dropTarget, setDropTarget] = useState(null);
+      const [dragLayer, setDragLayer] = useState(null);
+      const [view, setView] = useState({ zoom: 1, panX: 0, panY: 0 });
+
+      const svgRef = useRef(null);
+      const interaction = useRef(null); // { kind, snapshot, ... }
+      const selRef = useRef(selId);
+      useEffect(() => { selRef.current = selId; }, [selId]);
+
+      const sel = selId ? findNode(parts, selId) : null;
+
+      /* ---------- 履歴 ---------- */
+      const commit = (next) => setHist(h => ({ past: h.past.concat([h.present]).slice(-80), present: next, future: [] }));
+      const live = (next) => setHist(h => ({ ...h, present: next }));
+      const undo = useCallback(() => setHist(h => h.past.length ? { past: h.past.slice(0, -1), present: h.past[h.past.length - 1], future: [h.present].concat(h.future) } : h), []);
+      const redo = useCallback(() => setHist(h => h.future.length ? { past: h.past.concat([h.present]), present: h.future[0], future: h.future.slice(1) } : h), []);
+
+      const patchNode = (id, patch, doCommit = true) => {
+        const next = updateNode(parts, id, patch);
+        doCommit ? commit(next) : live(next);
+      };
+      const patchShape = (id, sp) => patchNode(id, n => ({ shape: { ...n.shape, ...sp } }));
+
+      /* ---------- 画面座標 → キャンバス座標 ---------- */
+      const toCanvas = (e) => {
+        const r = svgRef.current.getBoundingClientRect();
+        return [(e.clientX - r.left - view.panX) / view.zoom, (e.clientY - r.top - view.panY) / view.zoom];
+      };
+
+      /* ---------- パーツ追加 ---------- */
+      const addPart = (type, at) => {
+        const shape = defaultShape(type);
+        const palette = ['#f87171', '#fb923c', '#fbbf24', '#a3e635', '#34d399', '#22d3ee', '#818cf8', '#e879f9'];
+        const nextColor = palette[flatten(parts).length % palette.length];
+        if (type === 'line' || type === 'arc') shape.stroke = nextColor; else shape.fill = nextColor;
+        const names = { rect: '四角', ellipse: '円', triangle: '三角', polygon: '多角形', line: '線', star: '星', semicircle: '半円', arc: '円弧', free: '自由形' };
+        const node = {
+          id: uid(), name: names[type] || type, role: '', tags: [],
+          x: at ? at[0] : 400 + (flatten(parts).length % 6) * 24, y: at ? at[1] : 300 + (flatten(parts).length % 6) * 24, rotation: 0, scaleX: 1, scaleY: 1,
+          pivot: { x: 0, y: 0 }, visible: true, shape, children: [],
+        };
+        /* 選択中のパーツがあれば、その子として追加(親子関係を自然に作れる) */
+        if (sel && !at) {
+          const next = updateNode(parts, sel.id, n => ({ children: (n.children || []).concat([{ ...node, x: 0, y: 0 }]) }));
+          commit(next); setSelId(node.id);
+          setExpanded(ex => ({ ...ex, [sel.id]: true }));
+        } else {
+          commit(parts.concat([node])); setSelId(node.id);
+        }
+      };
+
+      const addEmptyGroup = () => {
+        const node = { id: uid(), name: 'グループ', role: '', tags: [], x: 400, y: 300, rotation: 0, scaleX: 1, scaleY: 1, pivot: { x: 0, y: 0 }, visible: true, children: [] };
+        if (sel) {
+          commit(updateNode(parts, sel.id, n => ({ children: (n.children || []).concat([{ ...node, x: 0, y: 0 }]) })));
+          setExpanded(ex => ({ ...ex, [sel.id]: true }));
+        } else commit(parts.concat([node]));
+        setSelId(node.id);
+      };
+
+      const deleteSel = useCallback(() => {
+        if (!selRef.current) return;
+        setHist(h => ({ past: h.past.concat([h.present]), present: removeNodes(h.present, [selRef.current]), future: [] }));
+        setSelId(null);
+      }, []);
+
+      const duplicateSel = useCallback(() => {
+        const id = selRef.current; if (!id) return;
+        setHist(h => {
+          const orig = findNode(h.present, id); if (!orig) return h;
+          const copy = reId(clone(orig)); copy.name = orig.name + ' コピー'; copy.role = '';
+          const parent = findParent(h.present, id);
+          const off = (n) => ({ ...n, x: n.x + 20, y: n.y + 20 });
+          const next = parent
+            ? updateNode(h.present, parent.id, p => ({ children: p.children.concat([off(copy)]) }))
+            : h.present.concat([off(copy)]);
+          setSelId(copy.id);
+          return { past: h.past.concat([h.present]), present: next, future: [] };
+        });
+      }, []);
+
+      /* 親子付け替え: 見た目の位置が変わらないよう、座標を変換し直す */
+      const reparent = (childId, newParentId) => {
+        const child = findNode(parts, childId);
+        if (!child) return;
+        if (newParentId === childId) return;
+        if (newParentId && isDescendant(child, newParentId)) return;
+        const wm = worldMatrixOf(parts, childId);
+        const pm = newParentId ? worldMatrixOf(parts, newParentId) : IDENT;
+        const local = mul(inv(pm), wm); // 新しい親空間での行列
+        /* 行列から x,y,rotation,scale を復元(pivotは保持) */
+        const rot = Math.atan2(local[1], local[0]);
+        const sx = Math.hypot(local[0], local[1]) || 1;
+        const sy = ((local[0] * local[3] - local[1] * local[2]) / sx) || 1;
+        const px = child.pivot?.x || 0, py = child.pivot?.y || 0;
+        const [nx, ny] = apply(local, px, py);
+        const moved = { ...clone(child), x: nx, y: ny, rotation: rot * 180 / Math.PI, scaleX: sx, scaleY: sy };
+        let next = removeNodes(parts, [childId]);
+        if (newParentId) next = updateNode(next, newParentId, n => ({ children: (n.children || []).concat([moved]) }));
+        else next = next.concat([moved]);
+        commit(next);
+        if (newParentId) setExpanded(ex => ({ ...ex, [newParentId]: true }));
+      };
+
+      const moveOrder = (id, dir) => {
+        const parent = findParent(parts, id);
+        const reorder = (arr) => {
+          const i = arr.findIndex(n => n.id === id); if (i < 0) return arr;
+          const j = dir === 'up' ? i + 1 : i - 1; if (j < 0 || j >= arr.length) return arr;
+          const a = arr.slice(); [a[i], a[j]] = [a[j], a[i]]; return a;
+        };
+        commit(parent ? updateNode(parts, parent.id, p => ({ children: reorder(p.children) })) : reorder(parts));
+      };
+
+      /* ---------- キーボード ---------- */
+      useEffect(() => {
+        const onKey = (e) => {
+          const t = e.target.tagName;
+          if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || e.target.isContentEditable) return;
+          const mod = e.ctrlKey || e.metaKey;
+          if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+          else if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
+          else if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicateSel(); }
+          else if (e.key === 'Delete') { e.preventDefault(); deleteSel(); }
+          else if (e.key === 'Escape') { setTool('select'); setSelId(null); }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+      }, [undo, redo, duplicateSel, deleteSel]);
+
+      /* =====================================================
+         キャンバス操作(移動 / 回転 / リサイズ / 基準点 / 頂点)
+         ===================================================== */
+      const beginInteraction = (e, data) => {
+        e.stopPropagation();
+        interaction.current = { ...data, snapshot: parts, moved: false };
+        svgRef.current.setPointerCapture(e.pointerId);
+      };
+
+      const onPartDown = (e, node) => {
+        if (tool !== 'select') {
+          /* 図形ツール中は、パーツの上でもクリックした位置に新しい図形を置く */
+          e.stopPropagation();
+          addPart(tool, toCanvas(e)); setTool('select');
+          return;
+        }
+        e.stopPropagation();
+        setSelId(node.id);
+        const [cx, cy] = toCanvas(e);
+        const pm = parentMatrixOf(parts, node.id);
+        const [px, py] = apply(inv(pm), cx, cy);
+        beginInteraction(e, { kind: 'move', id: node.id, startX: px, startY: py, origX: node.x, origY: node.y, pm });
+      };
+
+      const onCanvasDown = (e) => {
+        if (e.target !== svgRef.current && !e.target.dataset?.bg) return;
+        if (tool !== 'select') {
+          const at = toCanvas(e);
+          addPart(tool, at); setTool('select'); return;
+        }
+        setSelId(null);
+        /* 空白ドラッグでパン */
+        interaction.current = { kind: 'pan', sx: e.clientX, sy: e.clientY, ox: view.panX, oy: view.panY, snapshot: parts, moved: false };
+        svgRef.current.setPointerCapture(e.pointerId);
+      };
+
+      const onRotateDown = (e, node) => {
+        const wm = worldMatrixOf(parts, node.id);
+        const [wx, wy] = apply(wm, node.pivot?.x || 0, node.pivot?.y || 0);
+        const [cx, cy] = toCanvas(e);
+        const pm = parentMatrixOf(parts, node.id);
+        const pmRot = Math.atan2(pm[1], pm[0]) * 180 / Math.PI;
+        beginInteraction(e, {
+          kind: 'rotate', id: node.id, wx, wy, startAngle: Math.atan2(cy - wy, cx - wx),
+          startRot: node.rotation || 0, pmRot,
+        });
+      };
+
+      const onResizeDown = (e, node, handle) => {
+        beginInteraction(e, { kind: 'resize', id: node.id, handle, orig: clone(node), wm: worldMatrixOf(parts, node.id), pm: parentMatrixOf(parts, node.id) });
+      };
+
+      const onPivotDown = (e, node) => {
+        beginInteraction(e, { kind: 'pivot', id: node.id, orig: clone(node), wm: worldMatrixOf(parts, node.id) });
+      };
+
+      const onVertexDown = (e, node, idx) => {
+        beginInteraction(e, { kind: 'vertex', id: node.id, idx, wm: worldMatrixOf(parts, node.id) });
+      };
+
+      const onArcHandleDown = (e, node, which) => {
+        beginInteraction(e, { kind: 'arc', id: node.id, which, wm: worldMatrixOf(parts, node.id) });
+      };
+
+      const onMove = (e) => {
+        const it = interaction.current;
+        if (!it) return;
+        it.moved = true;
+
+        if (it.kind === 'pan') {
+          setView(v => ({ ...v, panX: it.ox + (e.clientX - it.sx), panY: it.oy + (e.clientY - it.sy) }));
+          return;
+        }
+        const [cx, cy] = toCanvas(e);
+
+        if (it.kind === 'move') {
+          const [px, py] = apply(inv(it.pm), cx, cy);
+          let nx = it.origX + (px - it.startX), ny = it.origY + (py - it.startY);
+          if (e.shiftKey) { nx = Math.round(nx / 10) * 10; ny = Math.round(ny / 10) * 10; }
+          live(updateNode(it.snapshot, it.id, { x: nx, y: ny }));
+        }
+        else if (it.kind === 'rotate') {
+          const ang = Math.atan2(cy - it.wy, cx - it.wx);
+          let rot = it.startRot + (ang - it.startAngle) * 180 / Math.PI;
+          if (e.shiftKey) rot = Math.round(rot / 15) * 15;
+          live(updateNode(it.snapshot, it.id, { rotation: ((rot % 360) + 540) % 360 - 180 }));
+        }
+        else if (it.kind === 'resize') {
+          /* ローカル空間(pivot基準ではなく図形中心基準)で点を求める */
+          const localInv = inv(mul(it.wm, [1, 0, 0, 1, it.orig.pivot?.x || 0, it.orig.pivot?.y || 0]));
+          /* ワールド→「pivot原点のローカル」に戻した後、pivot分を足して図形中心基準にする */
+          const [lx0, ly0] = apply(inv(it.wm), cx, cy);
+          const lx = lx0, ly = ly0;
+          const h = it.handle, o = it.orig.shape;
+          let w = o.w, hh = o.h, ox = 0, oy = 0;
+          const min = 4;
+          if (h.includes('e')) { w = Math.max(min, lx + o.w / 2 - 0); ox = 0; }
+          if (h.includes('w')) { w = Math.max(min, o.w / 2 - lx); }
+          if (h.includes('s')) { hh = Math.max(min, ly + o.h / 2); }
+          if (h.includes('n')) { hh = Math.max(min, o.h / 2 - ly); }
+          if (e.shiftKey && o.h > 0 && o.w > 0 && h.length === 2) { const k = Math.max(w / o.w, hh / o.h); w = o.w * k; hh = o.h * k; }
+          /* 反対側の辺を固定するため、中心のずれを計算して x,y を補正 */
+          const dxL = (w - o.w) / 2 * (h.includes('e') ? 1 : h.includes('w') ? -1 : 0);
+          const dyL = (hh - o.h) / 2 * (h.includes('s') ? 1 : h.includes('n') ? -1 : 0);
+          const nodeM = nodeMatrix(it.orig);
+          /* ローカルのずれを親空間へ(回転・スケール反映) */
+          const [ax, ay] = [nodeM[0] * dxL + nodeM[2] * dyL, nodeM[1] * dxL + nodeM[3] * dyL];
+          const newShape = { ...o, w, h: o.type === 'line' ? 0 : hh };
+          live(updateNode(it.snapshot, it.id, {
+            shape: newShape,
+            x: it.orig.x + ax, y: it.orig.y + ay,
+            pivot: { x: (it.orig.pivot?.x || 0) + dxL, y: (it.orig.pivot?.y || 0) + dyL },
+          }));
+        }
+        else if (it.kind === 'pivot') {
+          /* 基準点を動かしても、見た目の位置は変えない(x,yを補正) */
+          const [lx, ly] = apply(inv(it.wm), cx, cy);
+          let nx = lx, ny = ly;
+          if (e.shiftKey) { nx = Math.round(nx / 5) * 5; ny = Math.round(ny / 5) * 5; }
+          const o = it.orig;
+          const oldP = o.pivot || { x: 0, y: 0 };
+          const m = nodeMatrix(o);
+          /* 新しい基準点が親空間のどこに来るか → それが新しい x,y */
+          const [npx, npy] = apply(m, nx, ny);
+          live(updateNode(it.snapshot, it.id, { pivot: { x: nx, y: ny }, x: npx, y: npy }));
+        }
+        else if (it.kind === 'vertex') {
+          const [lx, ly] = apply(inv(it.wm), cx, cy);
+          const node = findNode(it.snapshot, it.id);
+          const s = node.shape;
+          /* ローカル(pivot基準) → 図形中心基準 */
+          const cxL = lx + (node.pivot?.x || 0), cyL = ly + (node.pivot?.y || 0);
+          const pts = s.points.map(p => p.slice());
+          pts[it.idx] = [cxL / (s.w || 1), cyL / (s.h || 1)];
+          live(updateNode(it.snapshot, it.id, { shape: { ...s, points: pts } }));
+        }
+        else if (it.kind === 'arc') {
+          const [lx, ly] = apply(inv(it.wm), cx, cy);
+          const node = findNode(it.snapshot, it.id);
+          const ang = Math.atan2(ly + (node.pivot?.y || 0), lx + (node.pivot?.x || 0)) * 180 / Math.PI;
+          let a = Math.round(((ang % 360) + 360) % 360);
+          live(updateNode(it.snapshot, it.id, { shape: { ...node.shape, [it.which]: a } }));
+        }
+      };
+
+      const onUp = (e) => {
+        const it = interaction.current;
+        if (!it) return;
+        interaction.current = null;
+        try { svgRef.current.releasePointerCapture(e.pointerId); } catch (_) {}
+        if (it.kind !== 'pan' && it.moved && JSON.stringify(it.snapshot) !== JSON.stringify(parts)) {
+          setHist(h => ({ past: h.past.concat([it.snapshot]).slice(-80), present: h.present, future: [] }));
+        }
+      };
+
+      /* ホイールでズーム */
+      const onWheel = (e) => {
+        e.preventDefault();
+        const r = svgRef.current.getBoundingClientRect();
+        const mx = e.clientX - r.left, my = e.clientY - r.top;
+        setView(v => {
+          const z = Math.min(4, Math.max(0.25, v.zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1)));
+          const k = z / v.zoom;
+          return { zoom: z, panX: mx - (mx - v.panX) * k, panY: my - (my - v.panY) * k };
+        });
+      };
+      useEffect(() => {
+        const el = svgRef.current; if (!el) return;
+        const h = (e) => onWheel(e);
+        el.addEventListener('wheel', h, { passive: false });
+        return () => el.removeEventListener('wheel', h);
+      });
+
+      /* =====================================================
+         描画
+         ===================================================== */
+      const renderNode = (n) => {
+        if (n.visible === false) return null;
+        return (
+          <g key={n.id} transform={matStr(nodeMatrix(n))}>
+            {n.shape && (
+              <g onPointerDown={(e) => onPartDown(e, n)} style={{ cursor: tool === 'select' ? 'move' : 'crosshair' }}>
+                <ShapeBody p={n.shape} />
+                {/* 細い線でも掴みやすいよう、透明の太い当たり判定を重ねる */}
+                {(n.shape.type === 'line' || n.shape.type === 'arc') && (
+                  <g stroke="transparent" strokeWidth={Math.max(14, n.shape.strokeWidth + 8)} fill="none">
+                    {n.shape.type === 'line' ? <line x1={-n.shape.w / 2} y1="0" x2={n.shape.w / 2} y2="0" /> : <path d={arcPath(n.shape.w, n.shape.h, n.shape.startAngle, n.shape.endAngle)} />}
+                  </g>
+                )}
+              </g>
+            )}
+            {(n.children || []).map(renderNode)}
+          </g>
+        );
+      };
+
+      /* 選択パーツのハンドル類(ワールド座標で描く。ズームしても大きさが変わらないように) */
+      const renderOverlay = () => {
+        if (!sel) return null;
+        const wm = worldMatrixOf(parts, sel.id); if (!wm) return null;
+        const z = view.zoom;
+        const s = sel.shape;
+        const px = sel.pivot?.x || 0, py = sel.pivot?.y || 0;
+        const W = (x, y) => apply(wm, x, y);
+        const els = [];
+
+        if (s) {
+          /* 図形中心基準の箱 → pivot基準へ */
+          const corners = [[-s.w / 2, -s.h / 2], [s.w / 2, -s.h / 2], [s.w / 2, s.h / 2], [-s.w / 2, s.h / 2]].map(([x, y]) => W(x, y));
+          els.push(<polygon key="box" points={corners.map(c => c.join(',')).join(' ')} fill="none" stroke="#818cf8" strokeWidth={1.5 / z} strokeDasharray={`${5 / z} ${3 / z}`} className="pointer-events-none" />);
+
+          if (!vertexEdit) {
+            const hs = [['nw', -1, -1], ['n', 0, -1], ['ne', 1, -1], ['e', 1, 0], ['se', 1, 1], ['s', 0, 1], ['sw', -1, 1], ['w', -1, 0]];
+            hs.forEach(([h, ax, ay]) => {
+              if (s.type === 'line' && !h.match(/^[ew]$/)) return;
+              const [hx, hy] = W(ax * s.w / 2, ay * s.h / 2);
+              const size = 8 / z;
+              els.push(<rect key={'h' + h} x={hx - size / 2} y={hy - size / 2} width={size} height={size} fill="#fff" stroke="#6366f1" strokeWidth={1.5 / z} style={{ cursor: 'pointer' }} onPointerDown={(e) => onResizeDown(e, sel, h)} />);
+            });
+          }
+        }
+
+        /* 頂点編集 */
+        if (s && vertexEdit && s.points && Array.isArray(s.points[0])) {
+          s.points.forEach((p, i) => {
+            const [vx, vy] = W(p[0] * s.w - 0, p[1] * s.h - 0);
+            els.push(<circle key={'v' + i} cx={vx} cy={vy} r={6 / z} fill="#fbbf24" stroke="#78350f" strokeWidth={1.5 / z} style={{ cursor: 'pointer' }} onPointerDown={(e) => onVertexDown(e, sel, i)} />);
+          });
+        }
+
+        /* 円弧の角度ハンドル */
+        if (s && s.type === 'arc') {
+          ['startAngle', 'endAngle'].forEach((k, i) => {
+            const a = deg2rad(s[k]);
+            const [hx, hy] = W(Math.cos(a) * s.w / 2, Math.sin(a) * s.h / 2);
+            els.push(<circle key={'a' + k} cx={hx} cy={hy} r={6 / z} fill={i ? '#f472b6' : '#34d399'} stroke="#fff" strokeWidth={1.5 / z} style={{ cursor: 'pointer' }} onPointerDown={(e) => onArcHandleDown(e, sel, k)} />);
+          });
+        }
+
+        /* 回転ハンドル(基準点から伸びる) */
+        const [pwx, pwy] = W(px, py);
+        const rotLen = 50 / z;
+        const wRot = Math.atan2(wm[1], wm[0]);
+        const topY = s ? -s.h / 2 : -30;
+        const [tx, ty] = W(0, topY);
+        const dirx = tx - pwx, diry = ty - pwy, dl = Math.hypot(dirx, diry) || 1;
+        const rx = tx + (dirx / dl) * rotLen, ry = ty + (diry / dl) * rotLen;
+        if (!vertexEdit) {
+          els.push(<line key="rl" x1={tx} y1={ty} x2={rx} y2={ry} stroke="#10b981" strokeWidth={1.5 / z} className="pointer-events-none" />);
+          els.push(<circle key="rh" cx={rx} cy={ry} r={6 / z} fill="#10b981" stroke="#fff" strokeWidth={1.5 / z} style={{ cursor: 'grab' }} onPointerDown={(e) => onRotateDown(e, sel)} />);
+        }
+
+        /* 基準点(ピボット) */
+        const pr = 8 / z;
+        els.push(
+          <g key="pv" style={{ cursor: 'move' }} onPointerDown={(e) => onPivotDown(e, sel)}>
+            <circle cx={pwx} cy={pwy} r={pr * 1.6} fill="transparent" />
+            <circle cx={pwx} cy={pwy} r={pr} fill="#ef4444" stroke="#fff" strokeWidth={1.5 / z} />
+            <line x1={pwx - pr * 1.6} y1={pwy} x2={pwx + pr * 1.6} y2={pwy} stroke="#ef4444" strokeWidth={1.5 / z} className="pointer-events-none" />
+            <line x1={pwx} y1={pwy - pr * 1.6} x2={pwx} y2={pwy + pr * 1.6} stroke="#ef4444" strokeWidth={1.5 / z} className="pointer-events-none" />
+          </g>
+        );
+        return <g>{els}</g>;
+      };
+
+      /* 全パーツの基準点+親子ラインを薄く表示 */
+      const renderPivotMap = () => {
+        if (!showPivots) return null;
+        const z = view.zoom;
+        const out = [];
+        const walk = (nodes, parentWorld, acc) => {
+          nodes.forEach(n => {
+            const wm = mul(acc, nodeMatrix(n));
+            const [wx, wy] = apply(wm, n.pivot?.x || 0, n.pivot?.y || 0);
+            if (parentWorld) out.push(<line key={'l' + n.id} x1={parentWorld[0]} y1={parentWorld[1]} x2={wx} y2={wy} stroke="#f59e0b" strokeWidth={1.2 / z} strokeDasharray={`${3 / z} ${3 / z}`} opacity="0.7" />);
+            if (n.id !== selId) out.push(<circle key={'c' + n.id} cx={wx} cy={wy} r={3.5 / z} fill="#f59e0b" stroke="#451a03" strokeWidth={1 / z} />);
+            if (n.children) walk(n.children, [wx, wy], wm);
+          });
+        };
+        walk(parts, null, IDENT);
+        return <g className="pointer-events-none">{out}</g>;
+      };
+
+      /* =====================================================
+         左パネル: パーツ階層(ドラッグで親子付け替え)
+         ===================================================== */
+      const renderTree = (nodes, depth = 0) => nodes.slice().reverse().map(n => {
+        const hasKids = (n.children || []).length > 0;
+        const open = expanded[n.id] !== false; // 既定は展開
+        const isSel = n.id === selId;
+        const isDrop = dropTarget === n.id;
+        return (
+          <div key={n.id}>
+            <div
+              draggable
+              onDragStart={(e) => { setDragLayer(n.id); e.dataTransfer.effectAllowed = 'move'; }}
+              onDragEnd={() => { setDragLayer(null); setDropTarget(null); }}
+              onDragOver={(e) => { e.preventDefault(); if (dragLayer && dragLayer !== n.id) setDropTarget(n.id); }}
+              onDragLeave={() => setDropTarget(t => t === n.id ? null : t)}
+              onDrop={(e) => { e.preventDefault(); if (dragLayer) reparent(dragLayer, n.id); setDragLayer(null); setDropTarget(null); }}
+              onClick={() => setSelId(n.id)}
+              className={`flex items-center gap-1 pr-2 py-1.5 rounded cursor-pointer text-sm transition-colors ${isSel ? 'bg-indigo-600 text-white' : 'hover:bg-slate-700'} ${isDrop ? 'ring-2 ring-amber-400 bg-amber-500/20' : ''}`}
+              style={{ paddingLeft: 6 + depth * 16 }}
+            >
+              <button className="w-4 text-slate-400 hover:text-white shrink-0" onClick={(e) => { e.stopPropagation(); setExpanded(ex => ({ ...ex, [n.id]: !open })); }}>
+                {hasKids ? (open ? ICONS.chevD : ICONS.chevR) : <span className="inline-block w-3.5" />}
+              </button>
+              <span className={`shrink-0 ${isSel ? 'text-indigo-200' : 'text-slate-400'}`}>{ICONS[n.shape?.type || 'group']}</span>
+              <span className="flex-1 truncate">{n.name}</span>
+              {n.role && <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono shrink-0 ${isSel ? 'bg-indigo-500/60' : 'bg-slate-900 text-emerald-400'}`}>{n.role}</span>}
+              <button className={`shrink-0 ${isSel ? 'text-indigo-100' : 'text-slate-500 hover:text-white'}`} onClick={(e) => { e.stopPropagation(); patchNode(n.id, { visible: n.visible === false }); }}>
+                {n.visible === false ? ICONS.eyeOff : ICONS.eye}
+              </button>
+            </div>
+            {hasKids && open && renderTree(n.children, depth + 1)}
+          </div>
+        );
+      });
+
+      /* =====================================================
+         右パネル: プロパティ
+         ===================================================== */
+      const setPivotPreset = (ax, ay) => {
+        if (!sel?.shape) return;
+        const nx = ax * sel.shape.w / 2, ny = ay * sel.shape.h / 2;
+        const m = nodeMatrix(sel);
+        const [npx, npy] = apply(m, nx, ny);
+        patchNode(sel.id, { pivot: { x: nx, y: ny }, x: npx, y: npy });
+      };
+
+      const renderProps = () => {
+        if (!sel) return (
+          <div className="text-slate-500 text-sm p-4 leading-relaxed">
+            <p className="mb-3">パーツを選ぶと、ここで名前・意味・基準点などを編集できます。</p>
+            <p className="text-slate-600 text-xs">上のボタンで図形を追加。パーツを選んだ状態で追加すると、その子パーツになります。</p>
+          </div>
+        );
+        const s = sel.shape;
+        const parent = findParent(parts, sel.id);
+        return (
+          <div className="p-3 space-y-4">
+            <section className="space-y-2">
+              <label className="block">
+                <span className="block text-[11px] text-slate-400 mb-0.5">パーツ名</span>
+                <input value={sel.name} onChange={(e) => patchNode(sel.id, { name: e.target.value })} className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-sm focus:outline-none focus:border-indigo-500" />
+              </label>
+              <label className="block">
+                <span className="block text-[11px] text-slate-400 mb-0.5">意味(role)― AIに何のパーツか伝える</span>
+                <input list="roles" value={sel.role || ''} onChange={(e) => patchNode(sel.id, { role: e.target.value.trim() })} placeholder="例: arm_r / head / weapon" className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-sm font-mono text-emerald-300 focus:outline-none focus:border-indigo-500" />
+                <datalist id="roles">{ROLE_PRESETS.flatMap(g => g.items).map(r => <option key={r} value={r} />)}</datalist>
+              </label>
+              <div className="flex flex-wrap gap-1">
+                {ROLE_PRESETS.flatMap(g => g.items).slice(0, 0)}
+                {['head', 'torso', 'arm_r', 'arm_l', 'leg_r', 'leg_l', 'eye_r', 'eye_l', 'mouth', 'weapon'].map(r => (
+                  <button key={r} onClick={() => patchNode(sel.id, { role: r })} className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${sel.role === r ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-slate-600 text-slate-400 hover:bg-slate-700'}`}>{r}</button>
+                ))}
+              </div>
+              <div className="text-[11px] text-slate-500">
+                親: <span className="text-slate-300">{parent ? parent.name : '(なし・一番上)'}</span>
+                {parent && <button className="ml-2 underline text-amber-400" onClick={() => reparent(sel.id, null)}>親から切り離す</button>}
+              </div>
+            </section>
+
+            <section>
+              <h3 className="text-xs font-semibold text-slate-300 mb-2">位置と動き</h3>
+              <div className="grid grid-cols-2 gap-2">
+                <NumField label="X(基準点の位置)" value={sel.x} onChange={(v) => patchNode(sel.id, { x: v })} />
+                <NumField label="Y(基準点の位置)" value={sel.y} onChange={(v) => patchNode(sel.id, { y: v })} />
+                <NumField label="回転(度)" value={sel.rotation || 0} onChange={(v) => patchNode(sel.id, { rotation: v })} />
+                <div />
+                <NumField label="横スケール" step={0.1} value={sel.scaleX ?? 1} onChange={(v) => patchNode(sel.id, { scaleX: v })} />
+                <NumField label="縦スケール" step={0.1} value={sel.scaleY ?? 1} onChange={(v) => patchNode(sel.id, { scaleY: v })} />
+              </div>
+              <input type="range" min="-180" max="180" value={sel.rotation || 0} onChange={(e) => patchNode(sel.id, { rotation: Number(e.target.value) }, false)} onPointerUp={() => setHist(h => h)} className="w-full mt-2 accent-indigo-500" />
+            </section>
+
+            {s && (
+              <section>
+                <h3 className="text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1">{ICONS.pivot} 基準点(回転の軸)</h3>
+                <p className="text-[11px] text-slate-500 mb-2">画面上の赤い●をドラッグしても動かせます。肩・ひじ・足首などに置くと関節になります。</p>
+                <div className="grid grid-cols-3 gap-1 w-36">
+                  {PIVOT_PRESETS.map(([label, ax, ay]) => (
+                    <button key={label} onClick={() => setPivotPreset(ax, ay)} className="text-[11px] py-1 rounded bg-slate-700 hover:bg-red-500/70 transition-colors">{label}</button>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {s && (
+              <section className="space-y-2">
+                <h3 className="text-xs font-semibold text-slate-300">形({SHAPE_LABEL[s.type]})</h3>
+                {s.type !== 'line' && <div className="grid grid-cols-2 gap-2">
+                  <NumField label="幅" value={s.w} onChange={(v) => patchShape(sel.id, { w: Math.max(1, v) })} />
+                  <NumField label="高さ" value={s.h} onChange={(v) => patchShape(sel.id, { h: Math.max(1, v) })} />
+                </div>}
+                {s.type === 'line' && <NumField label="長さ" value={s.w} onChange={(v) => patchShape(sel.id, { w: Math.max(1, v) })} />}
+                {s.type === 'rect' && <NumField label="角の丸み" value={s.radius || 0} onChange={(v) => patchShape(sel.id, { radius: Math.max(0, v) })} />}
+                {s.type === 'polygon' && <NumField label="角の数" value={s.sides} onChange={(v) => patchShape(sel.id, { sides: Math.min(24, Math.max(3, Math.round(v))) })} />}
+                {s.type === 'star' && <div className="grid grid-cols-2 gap-2">
+                  <NumField label="とがりの数" value={s.points} onChange={(v) => patchShape(sel.id, { points: Math.min(24, Math.max(3, Math.round(v))) })} />
+                  <NumField label="内側の比率" step={0.05} value={s.innerRatio} onChange={(v) => patchShape(sel.id, { innerRatio: Math.min(0.95, Math.max(0.05, v)) })} />
+                </div>}
+                {s.type === 'arc' && <div className="grid grid-cols-2 gap-2">
+                  <NumField label="開始角" value={s.startAngle} onChange={(v) => patchShape(sel.id, { startAngle: v })} />
+                  <NumField label="終了角" value={s.endAngle} onChange={(v) => patchShape(sel.id, { endAngle: v })} />
+                </div>}
+                {(s.type === 'triangle' || s.type === 'free') && (
+                  <div className="space-y-2">
+                    <button onClick={() => setVertexEdit(v => !v)} className={`w-full py-1.5 rounded text-xs font-medium ${vertexEdit ? 'bg-amber-500 text-black' : 'bg-slate-700 hover:bg-slate-600'}`}>
+                      {vertexEdit ? '✔ 頂点を編集中(クリックで終了)' : '頂点を編集する'}
+                    </button>
+                    {s.type === 'free' && (
+                      <div className="flex gap-1">
+                        <button className="flex-1 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600" onClick={() => {
+                          const p = s.points; const a = p[p.length - 1], b = p[0];
+                          patchShape(sel.id, { points: p.concat([[(a[0] + b[0]) / 2 + 0.1, (a[1] + b[1]) / 2 + 0.1]]) });
+                        }}>頂点を追加</button>
+                        <button className="flex-1 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-40" disabled={s.points.length <= 3} onClick={() => patchShape(sel.id, { points: s.points.slice(0, -1) })}>最後を削除</button>
+                        <button className="flex-1 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600" onClick={() => patchShape(sel.id, { closed: !s.closed })}>{s.closed ? '線にする' : '閉じる'}</button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {s && (
+              <section className="space-y-2">
+                <h3 className="text-xs font-semibold text-slate-300">色と線</h3>
+                {!['line', 'arc'].includes(s.type) && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-slate-400 w-10">塗り</span>
+                    <input type="color" value={s.fill === 'none' ? '#cccccc' : s.fill} onChange={(e) => patchShape(sel.id, { fill: e.target.value })} className="w-8 h-7 bg-transparent border-0 p-0 cursor-pointer" />
+                    <input value={s.fill} onChange={(e) => patchShape(sel.id, { fill: e.target.value })} className="flex-1 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs font-mono" />
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-slate-400 w-10">線色</span>
+                  <input type="color" value={s.stroke} onChange={(e) => patchShape(sel.id, { stroke: e.target.value })} className="w-8 h-7 bg-transparent border-0 p-0 cursor-pointer" />
+                  <input value={s.stroke} onChange={(e) => patchShape(sel.id, { stroke: e.target.value })} className="flex-1 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs font-mono" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <NumField label="線の太さ" value={s.strokeWidth} onChange={(v) => patchShape(sel.id, { strokeWidth: Math.max(0, v) })} />
+                  <NumField label="透明度(0〜1)" step={0.1} value={s.opacity} onChange={(v) => patchShape(sel.id, { opacity: Math.min(1, Math.max(0, v)) })} />
+                </div>
+              </section>
+            )}
+
+            <section className="flex gap-2 pt-2 border-t border-slate-700">
+              <button onClick={() => moveOrder(sel.id, 'down')} className="flex-1 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs flex items-center justify-center gap-1">{ICONS.down} 後ろへ</button>
+              <button onClick={() => moveOrder(sel.id, 'up')} className="flex-1 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs flex items-center justify-center gap-1">{ICONS.up} 前へ</button>
+            </section>
+          </div>
+        );
+      };
+
+      /* =====================================================
+         書き出し / 読み込み
+         ===================================================== */
+      const exportJSON = useMemo(() => JSON.stringify(buildExport(parts, CANVAS), null, 2), [parts]);
+
+      const copyText = (text, key) => {
+        const done = () => { setCopied(key); setTimeout(() => setCopied(''), 1800); };
+        if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+        else fallbackCopy(text, done);
+      };
+      const fallbackCopy = (text, done) => {
+        const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(); } catch (_) {}
+        document.body.removeChild(ta);
+      };
+
+      const downloadText = (text, name, mime = 'application/json') => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([text], { type: mime }));
+        a.download = name; a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 500);
+      };
+
+      /* ゲームに貼れる「完結した1つのHTML」ひな形 */
+      const standaloneHTML = () => `<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8"><title>Rig Demo</title>
+<style>body{margin:0;background:#0f172a;display:flex;justify-content:center;align-items:center;height:100vh}#stage{width:min(90vw,800px);aspect-ratio:${CANVAS.width}/${CANVAS.height};background:#1e293b}</style></head>
+<body><div id="stage"></div>
+<script>
+${RUNTIME_SRC}
+
+const RIG_JSON = ${JSON.stringify(buildExport(parts, CANVAS))};
+
+const rig = createRig(RIG_JSON, document.getElementById('stage'));
+
+/* 動かしてみる例: 右腕をふる */
+let t = 0;
+(function loop(){
+  t += 0.08;
+  if (rig.get('arm_r')) rig.set('arm_r', { rotation: Math.sin(t) * 40 });
+  requestAnimationFrame(loop);
+})();
+<\/script></body></html>`;
+
+      const doImport = () => {
+        try {
+          const data = JSON.parse(importText);
+          const list = Array.isArray(data) ? data : data.parts;
+          if (!Array.isArray(list)) throw new Error('parts の配列が見つかりません');
+          commit(list.map(importPart)); setSelId(null); setModal(null); setImportText(''); setImportErr('');
+        } catch (err) { setImportErr('読み込めませんでした: ' + err.message); }
+      };
+
+      /* =====================================================
+         ポーズ確認パネル(親子・基準点が効いているかを試せる)
+         roleを持つパーツにスライダーが出る。編集履歴には残さない。
+         ===================================================== */
+      const [poseOpen, setPoseOpen] = useState(false);
+      const poseParts = useMemo(() => flatten(parts).filter(({ node }) => node.role).map(({ node }) => node), [parts]);
+
+      /* =====================================================
+         画面
+         ===================================================== */
+      const toolLabel = { select: '選択・移動', rect: '四角形', ellipse: '円', triangle: '三角形', polygon: '多角形', line: '線', star: '星', semicircle: '半円', arc: '円弧', free: '自由変形' };
+
+      return (
+        <div className="flex flex-col h-screen w-full bg-slate-900 text-slate-200 overflow-hidden no-select" style={{ fontFamily: '"Hiragino Sans","Noto Sans JP","Yu Gothic",system-ui,sans-serif' }}>
+          {/* ---- 上部バー ---- */}
+          <header className="flex items-center gap-3 px-4 py-2 border-b border-slate-700 bg-slate-800 shrink-0 flex-wrap">
+            <h1 className="text-base font-bold tracking-wide text-indigo-300 mr-2">Parts Rig Editor</h1>
+
+            <div className="flex bg-slate-900 rounded-md p-1 border border-slate-700 gap-0.5">
+              {TOOLS.map(t => (
+                <button key={t} onClick={() => setTool(t)} title={toolLabel[t] + (t !== 'select' ? '(クリックでキャンバスに置く / 選択中のパーツの子として追加)' : '')}
+                  className={`p-1.5 rounded transition-colors ${tool === t ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}>{ICONS[t]}</button>
+              ))}
+            </div>
+            <button onClick={() => { if (tool === 'select') { /* 追加ボタン: 選択があれば子として追加 */ } }} className="hidden" />
+
+            <div className="flex bg-slate-900 rounded-md p-1 border border-slate-700 gap-0.5 items-center">
+              <button onClick={() => addPart(tool === 'select' ? 'rect' : tool)} className="px-2 py-1 text-xs rounded bg-emerald-600 hover:bg-emerald-500 text-white font-medium" title="選択中のパーツの子として追加(何も選んでなければ中央に追加)">
+                ＋{tool === 'select' ? '四角形' : toolLabel[tool]}を追加
+              </button>
+              <button onClick={addEmptyGroup} className="px-2 py-1 text-xs rounded hover:bg-slate-700 flex items-center gap-1" title="見えない親パーツ(関節・グループ用)">{ICONS.group} グループ</button>
+            </div>
+
+            <div className="flex bg-slate-900 rounded-md p-1 border border-slate-700">
+              <button onClick={undo} disabled={!hist.past.length} className="p-1.5 rounded disabled:text-slate-600 hover:bg-slate-700" title="元に戻す (Ctrl+Z)">{ICONS.undo}</button>
+              <button onClick={redo} disabled={!hist.future.length} className="p-1.5 rounded disabled:text-slate-600 hover:bg-slate-700" title="やり直す (Ctrl+Y)">{ICONS.redo}</button>
+              <div className="w-px bg-slate-700 mx-1" />
+              <button onClick={duplicateSel} disabled={!selId} className="p-1.5 rounded disabled:text-slate-600 hover:bg-slate-700" title="複製 (Ctrl+D)">{ICONS.copy}</button>
+              <button onClick={deleteSel} disabled={!selId} className="p-1.5 rounded disabled:text-slate-600 text-red-400 hover:bg-red-500/20" title="削除 (Deleteキー)">{ICONS.trash}</button>
+            </div>
+
+            <label className="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer">
+              <input type="checkbox" checked={showPivots} onChange={(e) => setShowPivots(e.target.checked)} className="accent-amber-500" />
+              基準点と親子線を表示
+            </label>
+
+            <div className="ml-auto flex gap-2">
+              <button onClick={() => setPoseOpen(o => !o)} className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium border ${poseOpen ? 'bg-amber-500 text-black border-amber-400' : 'border-slate-600 hover:bg-slate-700'}`}>{ICONS.play} ポーズ確認</button>
+              <button onClick={() => { setImportErr(''); setModal('import'); }} className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium border border-slate-600 hover:bg-slate-700">{ICONS.upload} 読み込み</button>
+              <button onClick={() => setModal('export')} className="flex items-center gap-1 px-4 py-1.5 rounded text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white">{ICONS.code} JSONを書き出す</button>
+            </div>
+          </header>
+
+          <div className="flex flex-1 overflow-hidden">
+            {/* ---- 左: パーツ階層 ---- */}
+            <aside className="w-64 bg-slate-800 border-r border-slate-700 flex flex-col shrink-0">
+              <div className="px-3 py-2 border-b border-slate-700">
+                <div className="text-sm font-semibold text-slate-200">パーツ一覧</div>
+                <div className="text-[11px] text-slate-500 leading-snug mt-0.5">ドラッグして別のパーツに重ねると、その子パーツになります(上が手前)</div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-1.5 scroll-thin"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => { if (e.target === e.currentTarget && dragLayer) { reparent(dragLayer, null); setDragLayer(null); setDropTarget(null); } }}>
+                {renderTree(parts)}
+                {parts.length === 0 && <div className="text-center text-slate-500 text-sm py-8">パーツがありません。<br />上のボタンから図形を追加してください。</div>}
+              </div>
+            </aside>
+
+            {/* ---- 中央: キャンバス ---- */}
+            <main className="flex-1 relative bg-slate-950 overflow-hidden">
+              <svg ref={svgRef} className="absolute inset-0 w-full h-full touch-none"
+                style={{ cursor: tool === 'select' ? 'default' : 'crosshair' }}
+                onPointerDown={onCanvasDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
+                <defs>
+                  <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#334155" strokeWidth="0.5" /></pattern>
+                </defs>
+                <g transform={`translate(${view.panX},${view.panY}) scale(${view.zoom})`}>
+                  <rect data-bg="1" x="-4000" y="-4000" width="8000" height="8000" fill="transparent" />
+                  <rect data-bg="1" x="0" y="0" width={CANVAS.width} height={CANVAS.height} fill="#0f172a" />
+                  <rect data-bg="1" x="0" y="0" width={CANVAS.width} height={CANVAS.height} fill="url(#grid)" />
+                  <rect x="0" y="0" width={CANVAS.width} height={CANVAS.height} fill="none" stroke="#475569" strokeWidth={1 / view.zoom} className="pointer-events-none" />
+                  {parts.map(renderNode)}
+                  {renderPivotMap()}
+                  {renderOverlay()}
+                </g>
+              </svg>
+
+              <div className="absolute bottom-3 left-3 flex items-center gap-2 text-xs text-slate-400 bg-slate-900/80 rounded px-2 py-1 pointer-events-none">
+                <span>{Math.round(view.zoom * 100)}%</span>
+                <span className="text-slate-600">|</span>
+                <span>ホイール: 拡大縮小 / 空白ドラッグ: 移動 / Shift: 角度・位置をそろえる</span>
+              </div>
+              <button onClick={() => setView({ zoom: 1, panX: 0, panY: 0 })} className="absolute bottom-3 right-3 text-xs bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded px-2 py-1">表示をリセット</button>
+
+              {tool !== 'select' && (
+                <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-xs px-3 py-1.5 rounded-full shadow-lg pointer-events-none">
+                  キャンバスをクリックして「{toolLabel[tool]}」を置く(Escでキャンセル)
+                </div>
+              )}
+
+              {/* ポーズ確認 */}
+              {poseOpen && (
+                <div className="absolute top-3 right-3 w-64 max-h-[70%] overflow-y-auto scroll-thin bg-slate-800/95 border border-amber-500/50 rounded-lg shadow-2xl">
+                  <div className="px-3 py-2 border-b border-slate-700 text-xs">
+                    <div className="font-semibold text-amber-400">ポーズ確認(動かして試す)</div>
+                    <div className="text-slate-400 mt-0.5 leading-snug">roleを付けたパーツの回転を動かせます。親を回すと子もついてくれば、親子と基準点は正しく設定できています。</div>
+                  </div>
+                  <div className="p-3 space-y-3">
+                    {poseParts.length === 0 && <div className="text-xs text-slate-500">roleが付いたパーツがありません。</div>}
+                    {poseParts.map(n => (
+                      <div key={n.id}>
+                        <div className="flex justify-between text-[11px] mb-0.5"><span className="font-mono text-emerald-400">{n.role}</span><span className="text-slate-400">{Math.round(n.rotation || 0)}°</span></div>
+                        <input type="range" min="-180" max="180" value={n.rotation || 0} className="w-full accent-amber-500"
+                          onPointerDown={() => { interaction.current = null; }}
+                          onChange={(e) => live(updateNode(hist.present, n.id, { rotation: Number(e.target.value) }))} />
+                      </div>
+                    ))}
+                    <button className="w-full py-1.5 text-xs rounded bg-slate-700 hover:bg-slate-600" onClick={() => {
+                      let next = hist.present; poseParts.forEach(n => { next = updateNode(next, n.id, { rotation: 0 }); }); live(next);
+                    }}>すべて回転0に戻す</button>
+                  </div>
+                </div>
+              )}
+            </main>
+
+            {/* ---- 右: プロパティ ---- */}
+            <aside className="w-72 bg-slate-800 border-l border-slate-700 flex flex-col shrink-0">
+              <div className="px-3 py-2 border-b border-slate-700 text-sm font-semibold">{sel ? `${sel.name} の設定` : '設定'}</div>
+              <div className="flex-1 overflow-y-auto scroll-thin">{renderProps()}</div>
+            </aside>
+          </div>
+
+          {/* ---- モーダル ---- */}
+          {modal === 'export' && (
+            <Modal title="JSONを書き出す" onClose={() => setModal(null)} wide>
+              <p className="text-sm text-slate-300 mb-2 leading-relaxed">このJSONをAIに貼って「右腕を振るコードを書いて」「敵キャラに改造して」と頼めます。ゲームに組み込むときは、下の「ゲーム用HTML」が完結した見本になります。</p>
+              <textarea readOnly value={exportJSON} className="w-full flex-1 min-h-[240px] bg-slate-950 border border-slate-700 rounded p-3 font-mono text-xs text-emerald-300 resize-none focus:outline-none" />
+              <div className="flex flex-wrap gap-2 mt-3 justify-end">
+                <button onClick={() => downloadText(exportJSON, 'character.json')} className="px-3 py-2 rounded text-sm border border-slate-600 hover:bg-slate-700 flex items-center gap-1">{ICONS.download} JSONを保存</button>
+                <button onClick={() => copyText(standaloneHTML(), 'html')} className="px-3 py-2 rounded text-sm border border-slate-600 hover:bg-slate-700 flex items-center gap-1">{copied === 'html' ? ICONS.check : ICONS.copy} ゲーム用HTMLをコピー</button>
+                <button onClick={() => downloadText(standaloneHTML(), 'character_demo.html', 'text/html')} className="px-3 py-2 rounded text-sm border border-slate-600 hover:bg-slate-700 flex items-center gap-1">{ICONS.download} ゲーム用HTMLを保存</button>
+                <button onClick={() => copyText(exportJSON, 'json')} className={`px-4 py-2 rounded text-sm font-bold text-white flex items-center gap-1 ${copied === 'json' ? 'bg-emerald-600' : 'bg-indigo-600 hover:bg-indigo-500'}`}>{copied === 'json' ? ICONS.check : ICONS.copy} {copied === 'json' ? 'コピーしました' : 'JSONをコピー'}</button>
+              </div>
+            </Modal>
+          )}
+
+          {modal === 'import' && (
+            <Modal title="JSONを読み込む" onClose={() => setModal(null)}>
+              <p className="text-sm text-slate-300 mb-2">書き出したJSON(またはAIが改造したJSON)を貼り付けてください。いまの編集内容は置き換わります(元に戻すで復元できます)。</p>
+              <textarea value={importText} onChange={(e) => setImportText(e.target.value)} placeholder='{ "format": "parts-rig/1", ... }' className="w-full flex-1 min-h-[240px] bg-slate-950 border border-slate-700 rounded p-3 font-mono text-xs text-slate-200 resize-none focus:outline-none focus:border-indigo-500" />
+              {importErr && <div className="text-sm text-red-400 mt-2">{importErr}</div>}
+              <div className="flex justify-end gap-2 mt-3">
+                <label className="px-3 py-2 rounded text-sm border border-slate-600 hover:bg-slate-700 cursor-pointer flex items-center gap-1">{ICONS.upload} ファイルを選ぶ
+                  <input type="file" accept=".json,application/json" className="hidden" onChange={(e) => { const f = e.target.files[0]; if (f) f.text().then(setImportText); }} />
+                </label>
+                <button onClick={doImport} disabled={!importText.trim()} className="px-4 py-2 rounded text-sm font-bold bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white">読み込む</button>
+              </div>
+            </Modal>
+          )}
+        </div>
+      );
+    }
+
+    function Modal({ title, children, onClose, wide }) {
+      return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
+          <div className={`bg-slate-800 rounded-lg shadow-2xl border border-slate-600 w-full ${wide ? 'max-w-3xl' : 'max-w-xl'} flex flex-col max-h-[90vh]`}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+              <h2 className="font-bold text-white">{title}</h2>
+              <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl leading-none px-2">&times;</button>
+            </div>
+            <div className="p-4 flex-1 overflow-hidden flex flex-col min-h-0">{children}</div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<Editor />);
+  </script>
 </body>
 </html>
