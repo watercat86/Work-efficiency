@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parts Rig Editor - HTML Workbench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#e8eee9; --panel:#f6f9f6; --ink:#17302c; --sub:#5b706b;
+  --line:#17302c; --accent:#2b55ff; --mark:#ffd84a;
+  --disp:"Dela Gothic One","Zen Kaku Gothic New",sans-serif;
+  --body:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#10201d; --panel:#172b27; --ink:#e6f0ea; --sub:#93aaa3; --line:#e6f0ea; --accent:#8aa2ff;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body)}
+header{padding:1.5rem;border-bottom:2px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:1rem}
+h1{margin:0;font-family:var(--disp);font-size:1.5rem}
+header a{color:var(--accent);text-decoration:none}
+header a:hover{text-decoration:underline}
+main{max-width:1200px;margin:0 auto;padding:2rem 1rem}
+.section{margin-bottom:2rem;padding:1.5rem;background:var(--panel);border:2px solid var(--line);border-radius:8px}
+.section h2{margin:0 0 1rem;font-family:var(--disp);font-size:1.25rem}
+.info{background:rgba(43,85,255,0.1);padding:1rem;border-left:4px solid var(--accent);margin-bottom:1rem;border-radius:4px}
+footer{text-align:center;padding:2rem 1rem;color:var(--sub);font-size:0.85rem;border-top:2px solid var(--line);margin-top:2rem}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎮 Parts Rig Editor</h1>
+  <a href="../">← ポータルに戻る</a>
+</header>
+
+<main>
+  <div class="info">
+    <strong>ℹ️ このページはサブディレクトリ版です</strong> - ここでツールを開くか、ポータルから戻ってく���さい。
+  </div>
+
+  <div class="section">
+    <h2>Parts Rig Editor について</h2>
+    <p>キャラクターのスプライトを図形で組み立てるエディタです。</p>
+    <ul>
+      <li>四角形・円・三角形・多角形などの図形でキャラクターを設計</li>
+      <li>関節(基準点)を設定して、親子関係で骨組みを作成</li>
+      <li>AIに「右腕を振るコード」を頼めるようにJSON書き出し対応</li>
+      <li>ゲーム用のスタンドアロンHTMLも自動生成</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>使い方</h2>
+    <ol>
+      <li>キャンバスに図形を置く</li>
+      <li>親子関係を作る</li>
+      <li>roleを付けて意味を設定</li>
+      <li>JSONを書き出してAIに渡す</li>
+    </ol>
+  </div>
+
+  <div class="section">
+    <h2>機能</h2>
+    <ul>
+      <li>✅ 図形描画(四角・円・三角形・多角形・星・半円・円弧・自由形)</li>
+      <li>✅ グループ化(見えない親パーツで関節を作成)</li>
+      <li>✅ 親子付け替え(ドラッグで階層変更)</li>
+      <li>✅ 基準点編集(回転・スケールの軸を設定)</li>
+      <li>✅ 頂点編集(三角形・自由形の頂点を直接変更)</li>
+      <li>✅ JSON書き出し＆読み込み</li>
+      <li>✅ ゲーム用HTMLスタンドアロン生成</li>
+      <li>✅ ズーム＆パン操作</li>
+      <li>✅ Undo/Redo</li>
+    </ul>
+  </div>
+</main>
+
+<footer>
+  © <span id="year"></span> watercat86 / <a href="https://github.com/watercat86/Work-efficiency">GitHub</a>
+  <script>document.getElementById("year").textContent = new Date().getFullYear();</script>
+</footer>
+</body>
+</html>
