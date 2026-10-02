@@ -1,0 +1,12 @@
+# GitHub Pages Configuration
+theme: null
+title: HTML Workbench
+description: HTMLを書く作業をラクにするための道具箱
+
+markdown: kramdown
+plugins:
+  - jekyll-seo-tag
+exclude:
+  - node_modules/
+  - package.json
+  - package-lock.json
