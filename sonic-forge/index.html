@@ -1,88 +1,820 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sonic Forge - HTML Workbench</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
-<style>
-:root{
-  --bg:#e8eee9; --panel:#f6f9f6; --ink:#17302c; --sub:#5b706b;
-  --line:#17302c; --accent:#2b55ff; --mark:#ffd84a;
-  --disp:"Dela Gothic One","Zen Kaku Gothic New",sans-serif;
-  --body:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
-}
-@media (prefers-color-scheme:dark){
-  :root{--bg:#10201d; --panel:#172b27; --ink:#e6f0ea; --sub:#93aaa3; --line:#e6f0ea; --accent:#8aa2ff;}
-}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body)}
-header{padding:1.5rem;border-bottom:2px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:1rem}
-h1{margin:0;font-family:var(--disp);font-size:1.5rem}
-header a{color:var(--accent);text-decoration:none}
-header a:hover{text-decoration:underline}
-main{max-width:1200px;margin:0 auto;padding:2rem 1rem}
-.section{margin-bottom:2rem;padding:1.5rem;background:var(--panel);border:2px solid var(--line);border-radius:8px}
-.section h2{margin:0 0 1rem;font-family:var(--disp);font-size:1.25rem}
-.info{background:rgba(43,85,255,0.1);padding:1rem;border-left:4px solid var(--accent);margin-bottom:1rem;border-radius:4px}
-footer{text-align:center;padding:2rem 1rem;color:var(--sub);font-size:0.85rem;border-top:2px solid var(--line);margin-top:2rem}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sonic Forge - Audio & SE Editor</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- Babel Standalone (JSXトランスパイル用) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-<body>
-<header>
-  <h1>🎵 Sonic Forge</h1>
-  <a href="../">← ポータルに戻る</a>
-</header>
+<body class="bg-gray-900 text-gray-300 font-sans select-none overflow-hidden">
+  <div id="root"></div>
 
-<main>
-  <div class="info">
-    <strong>ℹ️ このページはサブディレクトリ版です</strong> - ここでツールを開くか、ポータルから戻ってください。
-  </div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
 
-  <div class="section">
-    <h2>Sonic Forge について</h2>
-    <p>ビジュアル編集でゲーム音・BGMを作成するDAWです。</p>
-    <ul>
-      <li>複数のトラック(wave形状, ノイズなど)で音を重ねられる</li>
-      <li>ピアノロール風UIでノートを置いて作曲</li>
-      <li>リアルタイムプレイバック＋ループ再生対応</li>
-      <li>WAVファイルに書き出し可能</li>
-    </ul>
-  </div>
+    const MIN_PITCH = 36; // C2
+    const MAX_PITCH = 88; // E6
+    const PIXELS_PER_BEAT = 80;
+    const PIXELS_PER_PITCH = 16;
+    const TOTAL_BEATS = 32; // 8 bars of 4/4
+    const BPM = 120;
 
-  <div class="section">
-    <h2>使い方</h2>
-    <ol>
-      <li>トラックを選ぶ</li>
-      <li>ノートを置く</li>
-      <li>再生して確認</li>
-      <li>WAV書き出し</li>
-    </ol>
-  </div>
+    const WAVEFORMS = ['sine', 'square', 'sawtooth', 'triangle', 'noise'];
+    const TRACK_COLORS = ['#6366f1','#10b981','#f59e0b','#ec4899','#06b6d4','#a855f7','#ef4444','#84cc16'];
 
-  <div class="section">
-    <h2>機能</h2>
-    <ul>
-      <li>✅ 複数トラック(最大8色の音色)</li>
-      <li>✅ Wave形状選択(sine, square, sawtooth, triangle, noise)</li>
-      <li>✅ ピア��ロール式の作曲</li>
-      <li>✅ BPM変更</li>
-      <li>✅ ループ再生＆スナップ機能</li>
-      <li>✅ ノート削除・長さ変更</li>
-      <li>✅ トラック/ノート個別制御(ボリューム、ミュート、ソロ)</li>
-      <li>✅ SEプリセット(Coin, Jump, Laser, Power Up, Hit, Explosionなど)</li>
-      <li>✅ WAV書き出し</li>
-      <li>✅ JSON保存＆読み込み(シーケンス再利用)</li>
-      <li>✅ Attack/Release設定(音声エンベロープ)</li>
-    </ul>
-  </div>
-</main>
+    const PITCH_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const getPitchName = (pitch) => {
+      const octave = Math.floor(pitch / 12) - 1;
+      const note = PITCH_NAMES[pitch % 12];
+      return `${note}${octave}`;
+    };
 
-<footer>
-  © <span id="year"></span> watercat86 / <a href="https://github.com/watercat86/Work-efficiency">GitHub</a>
-  <script>document.getElementById("year").textContent = new Date().getFullYear();</script>
-</footer>
+    // Initial empty project structure
+    const createDefaultProject = () => ({
+      version: "1.0",
+      bpm: BPM,
+      tracks: [
+        {
+          id: "track-1",
+          name: "Melody",
+          waveform: "square",
+          volume: 0.8,
+          muted: false,
+          notes: []
+        },
+        {
+          id: "track-2",
+          name: "Bass",
+          waveform: "sawtooth",
+          volume: 0.8,
+          muted: false,
+          notes: []
+        }
+      ]
+    });
+
+    const generateId = () => Math.random().toString(36).substr(2, 9);
+
+    const noteHz = p => 440 * Math.pow(2, (p - 69) / 12);
+    const loadSaved = () => { try { const p = JSON.parse(localStorage.getItem('sonicforge')); if (p && Array.isArray(p.tracks) && p.tracks.length) return p; } catch (e) {} return createDefaultProject(); };
+    const saveBlob = (blob, name) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); };
+
+    // SEプリセット: n = [pitch, start(beat), duration(beat)]
+    const PRESETS = {
+      'Coin': { wf: 'square', n: [[83,0,0.25],[88,0.25,1]] },
+      'Jump': { wf: 'square', slide: 12, n: [[60,0,0.5]] },
+      'Laser': { wf: 'sawtooth', slide: -24, n: [[84,0,0.5]] },
+      'Power Up': { wf: 'square', n: [[60,0,0.25],[64,0.25,0.25],[67,0.5,0.25],[72,0.75,0.25],[76,1,0.75]] },
+      'Select': { wf: 'triangle', n: [[72,0,0.25],[79,0.25,0.5]] },
+      'Hit': { wf: 'noise', slide: -12, release: 0.15, n: [[60,0,0.5]] },
+      'Explosion': { wf: 'noise', slide: -24, release: 1, n: [[48,0,2]] },
+      'Game Over': { wf: 'triangle', n: [[67,0,0.5],[64,0.5,0.5],[60,1,0.5],[55,1.5,1.5]] },
+    };
+
+    // 再生・書き出し共通のスケジューラ (t0 = startBeat に対応する時刻)
+    function schedule(ctx, dest, project, startBeat, t0, nodes) {
+      const spb = 60 / Math.max(20, project.bpm || 120);
+      const anySolo = project.tracks.some(t => t.solo);
+      let noiseBuf = null;
+      project.tracks.forEach(tr => {
+        if (tr.muted || (anySolo && !tr.solo)) return;
+        tr.notes.forEach(n => {
+          const end = n.start + n.duration;
+          if (end <= startBeat) return;
+          const b0 = Math.max(n.start, startBeat);
+          const s = t0 + (b0 - startBeat) * spb, d = (end - b0) * spb;
+          const a = Math.min(tr.attack ?? 0.02, d / 2), r = Math.min(tr.release ?? 0.05, d / 2);
+          const peak = n.velocity * tr.volume;
+          const g = ctx.createGain();
+          g.gain.setValueAtTime(0, s);
+          g.gain.linearRampToValueAtTime(peak, s + a);
+          g.gain.setValueAtTime(peak, s + d - r);
+          g.gain.linearRampToValueAtTime(0, s + d);
+          let src;
+          if (tr.waveform === 'noise') {
+            if (!noiseBuf) { noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate); const c = noiseBuf.getChannelData(0); for (let i = 0; i < c.length; i++) c[i] = Math.random() * 2 - 1; }
+            src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+            const f = ctx.createBiquadFilter(); f.type = 'lowpass';
+            const f0 = Math.min(16000, noteHz(n.pitch) * 6), f1 = Math.min(16000, f0 * Math.pow(2, (tr.slide || 0) / 12));
+            f.frequency.setValueAtTime(f0, s); f.frequency.exponentialRampToValueAtTime(Math.max(50, f1), s + d);
+            src.connect(f); f.connect(g);
+          } else {
+            src = ctx.createOscillator(); src.type = tr.waveform;
+            src.frequency.setValueAtTime(noteHz(n.pitch), s);
+            if (tr.slide) src.frequency.exponentialRampToValueAtTime(noteHz(n.pitch + tr.slide), s + d);
+            src.connect(g);
+          }
+          g.connect(dest); src.start(s); src.stop(s + d + 0.02);
+          nodes.push(src);
+          src.onended = () => { const i = nodes.indexOf(src); if (i >= 0) nodes.splice(i, 1); try { g.disconnect(); } catch (e) {} };
+        });
+      });
+    }
+
+    async function renderWav(project, totalBeats) {
+      const spb = 60 / Math.max(20, project.bpm || 120);
+      let end = 0;
+      project.tracks.forEach(t => { if (!t.muted) t.notes.forEach(n => { end = Math.max(end, n.start + n.duration); }); });
+      if (!end) end = totalBeats;
+      const sr = 44100, len = Math.ceil(sr * (end * spb + 0.5));
+      const off = new OfflineAudioContext(2, len, sr);
+      const m = off.createGain(); m.gain.value = 0.5; m.connect(off.destination);
+      schedule(off, m, project, 0, 0, []);
+      const buf = await off.startRendering();
+      const ch = 2, ab = new ArrayBuffer(44 + len * ch * 2), v = new DataView(ab);
+      const w = (o, str) => [...str].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+      w(0, 'RIFF'); v.setUint32(4, 36 + len * ch * 2, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+      v.setUint16(22, ch, true); v.setUint32(24, sr, true); v.setUint32(28, sr * ch * 2, true); v.setUint16(32, ch * 2, true); v.setUint16(34, 16, true);
+      w(36, 'data'); v.setUint32(40, len * ch * 2, true);
+      const d0 = buf.getChannelData(0), d1 = buf.getChannelData(1);
+      let o = 44;
+      for (let i = 0; i < len; i++) for (const d of [d0, d1]) { const x = Math.max(-1, Math.min(1, d[i])); v.setInt16(o, x < 0 ? x * 0x8000 : x * 0x7fff, true); o += 2; }
+      return new Blob([ab], { type: 'audio/wav' });
+    }
+
+    class AudioEngine {
+      constructor() { this.ctx = null; this.master = null; this.nodes = []; this.startTime = 0; }
+      init() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+          this.master = this.ctx.createGain(); this.master.gain.value = 0.5; this.master.connect(this.ctx.destination);
+        }
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+      }
+      play(project, startBeat = 0) {
+        this.init(); this.stop();
+        const t0 = this.ctx.currentTime + 0.05;
+        this.startTime = t0 - startBeat * 60 / Math.max(20, project.bpm || 120);
+        schedule(this.ctx, this.master, project, startBeat, t0, this.nodes);
+      }
+      preview(pitch, track) {
+        this.init();
+        const p = { bpm: 120, tracks: [{ ...track, muted: false, solo: false, notes: [{ pitch, start: 0, duration: 0.5, velocity: 0.8 }] }] };
+        schedule(this.ctx, this.master, p, 0, this.ctx.currentTime + 0.01, this.nodes);
+      }
+      stop() { [...this.nodes].forEach(n => { try { n.stop(); } catch (e) {} }); this.nodes = []; }
+      getCurrentTime() { return this.ctx ? this.ctx.currentTime : 0; }
+    }
+
+    const audioEngine = new AudioEngine();
+
+    const PlayIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+    const StopIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" /></svg>;
+    const PointerIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" /></svg>;
+    const PenIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>;
+    const DownloadIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>;
+    const UploadIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>;
+    const PlusIcon = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>;
+    const TrashIcon = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
+
+    function App() {
+      const [project, setProject] = useState(loadSaved);
+      const [activeTrackId, setActiveTrackId] = useState(project.tracks[0]?.id);
+      const [selectedNote, setSelectedNote] = useState(null); // { trackId, noteId }
+      const [tool, setTool] = useState('select'); // 'select' | 'pen'
+      const [isPlaying, setIsPlaying] = useState(false);
+      const [playheadPos, setPlayheadPos] = useState(0); // in beats
+      const [startBeat, setStartBeat] = useState(0);
+      const [loop, setLoop] = useState(false);
+      const [snap, setSnap] = useState(0.25);
+      const totalBeats = (project.bars || 8) * 4;
+      const projectRef = useRef(project); projectRef.current = project;
+      const hist = useRef({ past: [], future: [] });
+      const lastDur = useRef(1);
+      const clip = useRef(null);
+      const gridRef = useRef(null);
+      const snapshot = () => { const h = hist.current; h.past.push(projectRef.current); if (h.past.length > 100) h.past.shift(); h.future = []; };
+      useEffect(() => { try { localStorage.setItem('sonicforge', JSON.stringify(project)); } catch (e) {} }, [project]);
+      useEffect(() => { if (canvasRef.current) canvasRef.current.scrollTop = (MAX_PITCH - 79) * PIXELS_PER_PITCH; }, []);
+
+      const canvasRef = useRef(null);
+      const playheadRef = useRef(null);
+      const isDraggingRef = useRef(false);
+      const dragStartRef = useRef(null);
+
+      useEffect(() => {
+        let animationFrame;
+        if (isPlaying) {
+          const updatePlayhead = () => {
+            if(audioEngine.ctx) {
+               const currentTime = audioEngine.getCurrentTime();
+               const elapsedTime = currentTime - audioEngine.startTime;
+               const currentBeat = elapsedTime * (project.bpm / 60);
+               
+               if(loop && currentBeat >= totalBeats) { audioEngine.play(projectRef.current, 0); animationFrame = requestAnimationFrame(updatePlayhead); } else if(currentBeat >= totalBeats) {
+                   setIsPlaying(false);
+                   audioEngine.stop();
+                   setPlayheadPos(startBeat);
+               } else {
+                   setPlayheadPos(currentBeat);
+                   const sc = canvasRef.current, px = currentBeat * PIXELS_PER_BEAT + 48;
+                   if (sc && (px > sc.scrollLeft + sc.clientWidth - 40 || px < sc.scrollLeft + 48)) sc.scrollLeft = Math.max(0, px - 100);
+                   animationFrame = requestAnimationFrame(updatePlayhead);
+               }
+            }
+          };
+          animationFrame = requestAnimationFrame(updatePlayhead);
+        } else {
+          setPlayheadPos(startBeat);
+        }
+        return () => cancelAnimationFrame(animationFrame);
+      }, [isPlaying, project.bpm, startBeat, loop, totalBeats]);
+
+      const handlePlay = () => {
+        if (isPlaying) {
+          setIsPlaying(false);
+          audioEngine.stop();
+          setPlayheadPos(startBeat);
+        } else {
+          setIsPlaying(true);
+          audioEngine.play(project, startBeat);
+        }
+      };
+
+      const handleExport = () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(project, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href",     dataStr);
+        downloadAnchorNode.setAttribute("download", "sequence.json");
+        document.body.appendChild(downloadAnchorNode); // required for firefox
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+      };
+
+      const handleImport = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const loadedProject = JSON.parse(event.target.result);
+            if (loadedProject.tracks) {
+              snapshot(); setProject(loadedProject);
+              setActiveTrackId(loadedProject.tracks[0]?.id);
+              setSelectedNote(null);
+            }
+          } catch (err) {
+            console.error("Failed to parse JSON", err);
+          }
+        };
+        reader.readAsText(file);
+      };
+
+      const addTrack = () => {
+        snapshot();
+        const newTrack = {
+          id: generateId(),
+          name: `Track ${project.tracks.length + 1}`,
+          waveform: 'square',
+          volume: 0.8,
+          muted: false,
+          notes: []
+        };
+        setProject({ ...project, tracks: [...project.tracks, newTrack] });
+        setActiveTrackId(newTrack.id);
+      };
+
+      const deleteTrack = (id) => {
+        snapshot();
+        const updatedTracks = project.tracks.filter(t => t.id !== id);
+        setProject({ ...project, tracks: updatedTracks });
+        if (activeTrackId === id) setActiveTrackId(updatedTracks[0]?.id || null);
+        if (selectedNote?.trackId === id) setSelectedNote(null);
+      };
+
+      const toggleMute = (id) => {
+        const updatedTracks = project.tracks.map(t => t.id === id ? { ...t, muted: !t.muted } : t);
+        setProject({ ...project, tracks: updatedTracks });
+      };
+
+      const colorOf = (id) => TRACK_COLORS[Math.max(0, project.tracks.findIndex(t => t.id === id)) % TRACK_COLORS.length];
+      const toggleSolo = (id) => setProject(p => ({ ...p, tracks: p.tracks.map(t => t.id === id ? { ...t, solo: !t.solo } : t) }));
+      const previewNote = (pitch, trackId) => { const tr = projectRef.current.tracks.find(t => t.id === trackId); if (tr && !isPlaying) audioEngine.preview(pitch, tr); };
+
+      const undo = () => { const h = hist.current; if (!h.past.length) return; h.future.push(projectRef.current); const p = h.past.pop(); setProject(p); setSelectedNote(null); setActiveTrackId(a => p.tracks.some(t => t.id === a) ? a : p.tracks[0]?.id); };
+      const redo = () => { const h = hist.current; if (!h.future.length) return; h.past.push(projectRef.current); const p = h.future.pop(); setProject(p); setSelectedNote(null); setActiveTrackId(a => p.tracks.some(t => t.id === a) ? a : p.tracks[0]?.id); };
+
+      const addPreset = (name) => {
+        const p = PRESETS[name]; if (!p) return;
+        snapshot();
+        const t = { id: generateId(), name, waveform: p.wf, volume: 0.8, muted: false, solo: false, slide: p.slide || 0, attack: 0.005, release: p.release ?? 0.05,
+          notes: p.n.map(([pitch, start, duration]) => ({ id: generateId(), pitch, start, duration, velocity: 0.9 })) };
+        setProject(pr => ({ ...pr, tracks: [...pr.tracks, t] }));
+        setActiveTrackId(t.id);
+      };
+      const dupTrack = () => {
+        if (!activeTrack) return; snapshot();
+        const c = { ...activeTrack, id: generateId(), name: activeTrack.name + ' copy', notes: activeTrack.notes.map(n => ({ ...n, id: generateId() })) };
+        setProject(p => ({ ...p, tracks: [...p.tracks, c] })); setActiveTrackId(c.id);
+      };
+      const handleWav = async () => { saveBlob(await renderWav(project, totalBeats), 'sound.wav'); };
+
+      const copyNote = () => { if (selectedNoteData) clip.current = { ...selectedNoteData }; };
+      const pasteNote = () => {
+        const c = clip.current; if (!c || !activeTrackId) return;
+        snapshot();
+        const n = { ...c, id: generateId(), start: c.start + c.duration };
+        clip.current = n;
+        updateTrack(activeTrackId, t => ({ ...t, notes: [...t.notes, n] }));
+        setSelectedNote({ trackId: activeTrackId, noteId: n.id });
+        previewNote(n.pitch, activeTrackId);
+      };
+      const nudge = (dp, db) => {
+        if (!selectedNoteData) return;
+        snapshot();
+        const { trackId, noteId } = selectedNote;
+        if (dp) { const p = Math.min(MAX_PITCH, Math.max(MIN_PITCH, selectedNoteData.pitch + dp)); updateNoteProperty(trackId, noteId, 'pitch', p); previewNote(p, trackId); }
+        if (db) updateNoteProperty(trackId, noteId, 'start', Math.max(0, selectedNoteData.start + db));
+      };
+
+      const getBeatAndPitchFromEvent = (e) => {
+        const rect = gridRef.current.getBoundingClientRect();
+        const beat = Math.floor((e.clientX - rect.left) / PIXELS_PER_BEAT / snap) * snap;
+        const pitch = MAX_PITCH - Math.floor((e.clientY - rect.top) / PIXELS_PER_PITCH);
+        return { beat: Math.max(0, beat), pitch: Math.min(MAX_PITCH, Math.max(MIN_PITCH, pitch)) };
+      };
+
+      const beginResize = (trackId, noteId, startX, startDur, needSnap) => {
+        let snapped = !needSnap;
+        const mv = (ev) => {
+          if (!snapped) { snapshot(); snapped = true; }
+          const d = Math.max(snap, Math.round((startDur + (ev.clientX - startX) / PIXELS_PER_BEAT) / snap) * snap);
+          updateNoteProperty(trackId, noteId, 'duration', d); lastDur.current = d;
+        };
+        const up = () => { window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); };
+        window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+      };
+
+      const handleCanvasMouseDown = (e) => {
+        if (isPlaying || e.button !== 0) return;
+        if (tool === 'pen') {
+          if (!activeTrackId) return;
+          const { beat, pitch } = getBeatAndPitchFromEvent(e);
+          snapshot();
+          const newNote = { id: generateId(), pitch, start: beat, duration: Math.max(snap, lastDur.current), velocity: 0.8 };
+          updateTrack(activeTrackId, t => ({ ...t, notes: [...t.notes, newNote] }));
+          setSelectedNote({ trackId: activeTrackId, noteId: newNote.id });
+          previewNote(pitch, activeTrackId);
+          beginResize(activeTrackId, newNote.id, e.clientX, newNote.duration, false);
+        } else if (e.target.classList.contains('bg-grid')) {
+          setSelectedNote(null);
+        }
+      };
+
+      const handleNoteMouseDown = (e, trackId, note) => {
+        e.stopPropagation();
+        if (isPlaying || tool !== 'select' || e.button !== 0) return;
+        setSelectedNote({ trackId, noteId: note.id });
+        setActiveTrackId(trackId);
+        previewNote(note.pitch, trackId);
+        const sx = e.clientX, sy = e.clientY; let lastP = note.pitch, snapped = false;
+        const mv = (ev) => {
+          if (!snapped) { snapshot(); snapped = true; }
+          const ns = Math.max(0, note.start + Math.round((ev.clientX - sx) / PIXELS_PER_BEAT / snap) * snap);
+          const np = Math.min(MAX_PITCH, Math.max(MIN_PITCH, note.pitch - Math.round((ev.clientY - sy) / PIXELS_PER_PITCH)));
+          updateNoteProperty(trackId, note.id, 'start', ns);
+          updateNoteProperty(trackId, note.id, 'pitch', np);
+          if (np !== lastP) { lastP = np; previewNote(np, trackId); }
+        };
+        const up = () => { window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); };
+        window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+      };
+
+      const updateTrack = (trackId, updater) => {
+        setProject(prev => ({
+          ...prev,
+          tracks: prev.tracks.map(t => t.id === trackId ? updater(t) : t)
+        }));
+      };
+
+      const updateNoteProperty = (trackId, noteId, prop, value) => {
+        setProject(prev => ({
+          ...prev,
+          tracks: prev.tracks.map(t => {
+            if (t.id === trackId) {
+              return {
+                ...t,
+                notes: t.notes.map(n => n.id === noteId ? { ...n, [prop]: value } : n)
+              };
+            }
+            return t;
+          })
+        }));
+      };
+
+      const deleteSelectedNote = () => {
+        if (!selectedNote) return;
+        snapshot();
+        updateTrack(selectedNote.trackId, (track) => ({
+          ...track,
+          notes: track.notes.filter(n => n.id !== selectedNote.noteId)
+        }));
+        setSelectedNote(null);
+      };
+
+      // Keyboard shortcuts
+      useEffect(() => {
+        const onKey = (e) => {
+          const tg = e.target.tagName, range = tg === 'INPUT' && e.target.type === 'range';
+          if ((tg === 'INPUT' && !range) || tg === 'SELECT' || tg === 'TEXTAREA') return;
+          const k = e.key.toLowerCase(), mod = e.ctrlKey || e.metaKey;
+          if (mod) {
+            if (k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+            else if (k === 'y') { e.preventDefault(); redo(); }
+            else if (k === 'c') copyNote();
+            else if (k === 'v') pasteNote();
+            else if (k === 'd') { e.preventDefault(); copyNote(); pasteNote(); }
+            else if (k === 's') { e.preventDefault(); handleExport(); }
+            return;
+          }
+          if (k === ' ') { e.preventDefault(); handlePlay(); }
+          else if (k === 'v') setTool('select');
+          else if (k === 'p') setTool('pen');
+          else if (k === 'backspace' || k === 'delete') deleteSelectedNote();
+          else if (!range && selectedNote && k === 'arrowup') { e.preventDefault(); nudge(e.shiftKey ? 12 : 1, 0); }
+          else if (!range && selectedNote && k === 'arrowdown') { e.preventDefault(); nudge(e.shiftKey ? -12 : -1, 0); }
+          else if (!range && selectedNote && k === 'arrowleft') { e.preventDefault(); nudge(0, -snap); }
+          else if (!range && selectedNote && k === 'arrowright') { e.preventDefault(); nudge(0, snap); }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+      });
+
+      const activeTrack = project.tracks.find(t => t.id === activeTrackId);
+      const selectedNoteData = selectedNote 
+        ? project.tracks.find(t => t.id === selectedNote.trackId)?.notes.find(n => n.id === selectedNote.noteId)
+        : null;
+        
+      const canvasHeight = (MAX_PITCH - MIN_PITCH + 1) * PIXELS_PER_PITCH;
+      const canvasWidth = totalBeats * PIXELS_PER_BEAT;
+
+      return (
+        <div className="flex flex-col h-screen bg-gray-900 text-gray-300 font-sans select-none">
+          
+          {/* Top Bar */}
+          <header className="flex items-center justify-between gap-4 px-4 h-14 shrink-0 whitespace-nowrap overflow-x-auto bg-gray-800 border-b border-gray-700">
+            <div className="flex items-center space-x-4">
+              <div className="text-white font-bold text-lg mr-4">Sonic Forge</div>
+              
+              <button 
+                onClick={handlePlay}
+                className={`p-2 rounded flex items-center space-x-1 ${isPlaying ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
+              >
+                {isPlaying ? <StopIcon /> : <PlayIcon />}
+                <span className="font-semibold text-sm">{isPlaying ? 'Stop' : 'Play'}</span>
+              </button>
+              
+              <div className="h-6 border-l border-gray-600 mx-2"></div>
+              
+              <div className="flex bg-gray-700 rounded p-1">
+                <button 
+                  onClick={() => setTool('select')}
+                  className={`p-1.5 rounded ${tool === 'select' ? 'bg-gray-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                  title="Select Tool (V)"
+                >
+                  <PointerIcon />
+                </button>
+                <button 
+                  onClick={() => setTool('pen')}
+                  className={`p-1.5 rounded ${tool === 'pen' ? 'bg-gray-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                  title="Pen Tool (P)"
+                >
+                  <PenIcon />
+                </button>
+              </div>
+
+              <div className="flex items-center ml-4 space-x-2 text-sm">
+                 <label className="text-gray-400">BPM:</label>
+                 <input 
+                    type="number" 
+                    value={project.bpm} 
+                    onChange={(e) => setProject({...project, bpm: Number(e.target.value)})}
+                    className="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white focus:outline-none focus:border-blue-500"
+                 />
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2 text-sm">
+              <button onClick={undo} disabled={!hist.current.past.length} className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded disabled:opacity-30" title="元に戻す (Ctrl+Z)">↩</button>
+              <button onClick={redo} disabled={!hist.current.future.length} className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded disabled:opacity-30" title="やり直す (Ctrl+Y)">↪</button>
+              <button onClick={() => setLoop(!loop)} className={`px-2 py-1 rounded ${loop ? 'bg-blue-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`} title="ループ再生">Loop</button>
+              <label className="text-gray-400 pl-2">Snap</label>
+              <select value={snap} onChange={(e) => setSnap(Number(e.target.value))} className="bg-gray-700 border border-gray-600 rounded px-1 py-1 text-white">
+                <option value={1}>1/4</option><option value={0.5}>1/8</option><option value={0.25}>1/16</option><option value={0.125}>1/32</option>
+              </select>
+              <label className="text-gray-400 pl-2">Bars</label>
+              <input type="number" min="1" max="64" value={project.bars || 8} onChange={(e) => setProject(p => ({ ...p, bars: Math.max(1, Math.min(64, Number(e.target.value) || 1)) }))} className="w-14 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white" />
+              <select value="" onChange={(e) => addPreset(e.target.value)} className="bg-gray-700 border border-gray-600 rounded px-1 py-1 text-white ml-2">
+                <option value="">+ SEプリセット</option>
+                {Object.keys(PRESETS).map(k => <option key={k} value={k}>{k}</option>)}
+              </select>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <button onClick={() => { if (confirm('現在の内容を破棄して新規作成しますか？（Undoで戻せます）')) { snapshot(); const p = createDefaultProject(); setProject(p); setActiveTrackId(p.tracks[0].id); setSelectedNote(null); } }} className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-sm transition">New</button>
+              <button onClick={handleWav} className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded text-sm transition">Export WAV</button>
+              <label className="cursor-pointer flex items-center space-x-1 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-sm transition">
+                <UploadIcon />
+                <span>Load JSON</span>
+                <input type="file" accept=".json" className="hidden" onChange={handleImport} />
+              </label>
+              <button 
+                onClick={handleExport}
+                className="flex items-center space-x-1 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-sm transition"
+              >
+                <DownloadIcon />
+                <span>Save JSON</span>
+              </button>
+            </div>
+          </header>
+
+          {/* Main Workspace */}
+          <div className="flex flex-1 overflow-hidden">
+            
+            {/* Left Panel: Tracks */}
+            <div className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
+              <div className="p-3 border-b border-gray-700 flex justify-between items-center">
+                <h2 className="text-sm font-semibold text-gray-200 uppercase tracking-wider">Tracks</h2>
+                <button onClick={addTrack} className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white">
+                  <PlusIcon />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                {project.tracks.map(track => (
+                  <div 
+                    key={track.id}
+                    onClick={() => setActiveTrackId(track.id)}
+                    className={`p-3 rounded border cursor-pointer transition-colors ${activeTrackId === track.id ? 'bg-gray-700 border-blue-500' : 'bg-gray-800 border-gray-600 hover:border-gray-500'}`}
+                  >
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-medium text-gray-200 text-sm truncate flex items-center"><i className="inline-block w-2 h-2 rounded-full mr-2 shrink-0" style={{ background: colorOf(track.id) }}></i>{track.name}</span>
+                      <div className="flex space-x-1">
+                        <button onClick={(e) => { e.stopPropagation(); toggleSolo(track.id); }} className={`text-xs px-2 py-0.5 rounded ${track.solo ? 'bg-yellow-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`} title="ソロ">S</button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); toggleMute(track.id); }}
+                          className={`text-xs px-2 py-0.5 rounded ${track.muted ? 'bg-red-900/50 text-red-400 border border-red-800' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
+                        >
+                          {track.muted ? 'M' : 'M'}
+                        </button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); deleteTrack(track.id); }}
+                          className="text-gray-500 hover:text-red-400 p-0.5 rounded"
+                        >
+                          <TrashIcon />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500 flex justify-between">
+                      <span>{track.waveform}</span>
+                      <span>Vol: {Math.round(track.volume * 100)}%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Center Area: Piano Roll */}
+            <div className="flex-1 flex flex-col bg-[#1e1e1e] relative overflow-hidden">
+               
+               {/* Scrollable Canvas Area */}
+               <div className="flex-1 overflow-auto relative flex" ref={canvasRef}>
+                  
+                  {/* Piano Keys (Y-Axis) */}
+                  <div className="w-12 bg-gray-800 border-r border-gray-700 shrink-0 sticky left-0 z-10">
+                     {Array.from({ length: MAX_PITCH - MIN_PITCH + 1 }).map((_, i) => {
+                        const pitch = MAX_PITCH - i;
+                        const isBlackKey = [1, 3, 6, 8, 10].includes(pitch % 12);
+                        return (
+                           <div 
+                              key={pitch} 
+                              className={`w-full flex items-center justify-end pr-1 text-[10px] border-b border-gray-800/50 ${isBlackKey ? 'bg-gray-900 text-gray-600' : 'bg-gray-200 text-gray-800'}`}
+                              style={{ height: PIXELS_PER_PITCH }}
+                           >
+                              {pitch % 12 === 0 ? getPitchName(pitch) : ''}
+                           </div>
+                        );
+                     })}
+                  </div>
+
+                  {/* Grid & Notes Area */}
+                  <div 
+                     className="relative bg-grid" ref={gridRef} 
+                     style={{ width: canvasWidth, height: canvasHeight }}
+                     onMouseDown={handleCanvasMouseDown}
+                  >
+                     {/* Ruler (click to set play start) */}
+                     <div className="sticky top-0 z-40 h-0">
+                       <div className="h-6 bg-gray-800/95 border-b border-gray-600 relative cursor-pointer text-[10px] text-gray-400" style={{ width: canvasWidth }}
+                         onMouseDown={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setStartBeat(Math.max(0, Math.floor((e.clientX - r.left) / PIXELS_PER_BEAT))); }}>
+                         {Array.from({ length: totalBeats }).map((_, i) => (
+                           <div key={i} className={`absolute top-0 h-full border-l ${i % 4 === 0 ? 'border-gray-400' : 'border-gray-700'}`} style={{ left: i * PIXELS_PER_BEAT }}>{i % 4 === 0 && <span className="ml-1">{i / 4 + 1}</span>}</div>
+                         ))}
+                         <div className="absolute top-0 h-full w-0.5 bg-emerald-400" style={{ left: startBeat * PIXELS_PER_BEAT }} />
+                       </div>
+                     </div>
+
+                     {/* Background Grid Lines */}
+                     <div className="absolute inset-0 pointer-events-none" style={{
+                        backgroundImage: `
+                          linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
+                          linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px)
+                        `,
+                        backgroundSize: `${PIXELS_PER_BEAT / 4}px ${PIXELS_PER_PITCH}px`,
+                     }}>
+                         {/* Bar lines (every 4 beats) */}
+                         <div className="absolute inset-0 pointer-events-none" style={{
+                            backgroundImage: `linear-gradient(to right, rgba(255,255,255,0.15) 1px, transparent 1px)`,
+                            backgroundSize: `${PIXELS_PER_BEAT * 4}px 100%`,
+                         }}></div>
+                     </div>
+
+                     {/* Black key rows */}
+                     {Array.from({ length: MAX_PITCH - MIN_PITCH + 1 }).map((_, i) => [1,3,6,8,10].includes((MAX_PITCH - i) % 12) ? <div key={i} className="absolute left-0 right-0 bg-black/20 pointer-events-none" style={{ top: i * PIXELS_PER_PITCH, height: PIXELS_PER_PITCH }} /> : null)}
+                     {/* Render Notes */}
+                     {project.tracks.map(track => (
+                        track.muted && track.id !== activeTrackId ? null : (
+                           track.notes.map(note => {
+                              const isSelected = selectedNote?.noteId === note.id;
+                              const isActiveTrack = activeTrackId === track.id;
+                              
+                              let opacity = 1;
+                              if (!isActiveTrack) opacity = 0.3;
+                              if (track.muted) opacity = 0.1;
+
+                              return (
+                                 <div
+                                    key={note.id}
+                                    onMouseDown={(e) => handleNoteMouseDown(e, track.id, note)}
+                                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); if (isPlaying) return; snapshot(); updateTrack(track.id, t => ({ ...t, notes: t.notes.filter(n => n.id !== note.id) })); setSelectedNote(null); }}
+                                    className={`absolute rounded-sm border cursor-pointer flex items-center shadow-sm overflow-hidden
+                                       ${isSelected ? 'border-white ring-1 ring-white z-20' : 'border-black/40 z-10'}
+                                       ${tool === 'select' ? 'hover:brightness-110' : ''}
+                                    `}
+                                    style={{
+                                       left: note.start * PIXELS_PER_BEAT,
+                                       top: (MAX_PITCH - note.pitch) * PIXELS_PER_PITCH,
+                                       width: note.duration * PIXELS_PER_BEAT,
+                                       height: PIXELS_PER_PITCH - 1,
+                                       opacity: opacity,
+                                       background: colorOf(track.id),
+                                    }}
+                                 >
+                                    <div className="h-full bg-white/20 pointer-events-none" style={{ width: `${note.velocity * 100}%` }}></div>
+                                    <span className="absolute left-1 text-[9px] text-white/90 pointer-events-none">{note.duration >= 0.5 ? getPitchName(note.pitch) : ''}</span>
+                                    <div className="absolute right-0 top-0 h-full w-1.5 cursor-ew-resize bg-white/30"
+                                      onMouseDown={(e) => { e.stopPropagation(); if (isPlaying || tool !== 'select' || e.button !== 0) return; setSelectedNote({ trackId: track.id, noteId: note.id }); setActiveTrackId(track.id); beginResize(track.id, note.id, e.clientX, note.duration, true); }} />
+                                 </div>
+                              );
+                           })
+                        )
+                     ))}
+
+                     {/* Playhead */}
+                     <div 
+                        ref={playheadRef}
+                        className="absolute top-0 bottom-0 w-[2px] bg-red-500 z-30 pointer-events-none shadow-[0_0_8px_rgba(239,68,68,0.8)] transition-all duration-75"
+                        style={{ left: playheadPos * PIXELS_PER_BEAT }}
+                     />
+                  </div>
+               </div>
+            </div>
+
+            {/* Right Panel: Properties */}
+            <div className="w-72 bg-gray-800 border-l border-gray-700 flex flex-col">
+               {/* Track Properties */}
+               <div className="p-4 border-b border-gray-700">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Track Properties</h3>
+                  {activeTrack ? (
+                     <div className="space-y-4">
+                        <div>
+                           <label className="block text-xs text-gray-500 mb-1">Name</label>
+                           <input 
+                              type="text" 
+                              value={activeTrack.name}
+                              onChange={(e) => updateTrack(activeTrackId, t => ({...t, name: e.target.value}))}
+                              className="w-full bg-gray-900 border border-gray-700 rounded p-1.5 text-sm text-white focus:border-blue-500 focus:outline-none"
+                           />
+                        </div>
+                        <div>
+                           <label className="block text-xs text-gray-500 mb-1">Waveform</label>
+                           <select 
+                              value={activeTrack.waveform}
+                              onChange={(e) => updateTrack(activeTrackId, t => ({...t, waveform: e.target.value}))}
+                              className="w-full bg-gray-900 border border-gray-700 rounded p-1.5 text-sm text-white focus:border-blue-500 focus:outline-none"
+                           >
+                              {WAVEFORMS.map(wf => <option key={wf} value={wf}>{wf}</option>)}
+                           </select>
+                        </div>
+                        <div>
+                           <label className="block text-xs text-gray-500 mb-1">Volume ({Math.round(activeTrack.volume * 100)}%)</label>
+                           <input 
+                              type="range" min="0" max="1" step="0.01" 
+                              value={activeTrack.volume}
+                              onChange={(e) => updateTrack(activeTrackId, t => ({...t, volume: parseFloat(e.target.value)}))}
+                              className="w-full accent-blue-500"
+                           />
+                        </div><div>
+                           <label className="block text-xs text-gray-500 mb-1">Pitch Slide ({activeTrack.slide || 0} 半音)</label>
+                           <input type="range" min="-36" max="36" step="1" value={activeTrack.slide || 0} onChange={(e) => updateTrack(activeTrackId, t => ({ ...t, slide: Number(e.target.value) }))} className="w-full accent-blue-500" />
+                        </div>
+                        <div>
+                           <label className="block text-xs text-gray-500 mb-1">Attack ({(activeTrack.attack ?? 0.02).toFixed(3)}s)</label>
+                           <input type="range" min="0" max="0.5" step="0.005" value={activeTrack.attack ?? 0.02} onChange={(e) => updateTrack(activeTrackId, t => ({ ...t, attack: Number(e.target.value) }))} className="w-full accent-blue-500" />
+                        </div>
+                        <div>
+                           <label className="block text-xs text-gray-500 mb-1">Release ({(activeTrack.release ?? 0.05).toFixed(2)}s)</label>
+                           <input type="range" min="0" max="1.5" step="0.01" value={activeTrack.release ?? 0.05} onChange={(e) => updateTrack(activeTrackId, t => ({ ...t, release: Number(e.target.value) }))} className="w-full accent-blue-500" />
+                        </div>
+                        <div className="flex space-x-2">
+                           <button onClick={dupTrack} className="flex-1 px-2 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs">複製</button>
+                           <button onClick={() => { snapshot(); updateTrack(activeTrackId, t => ({ ...t, notes: [] })); setSelectedNote(null); }} className="flex-1 px-2 py-1.5 bg-gray-700 hover:bg-red-900 rounded text-xs">ノート全削除</button>
+                        </div>
+                     
+                     </div>
+                  ) : (
+                     <div className="text-sm text-gray-500 italic">No track selected</div>
+                  )}
+               </div>
+
+               {/* Note Properties */}
+               <div className="p-4 flex-1 overflow-y-auto">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 flex justify-between items-center">
+                     Note Properties
+                     {selectedNoteData && (
+                        <button onClick={deleteSelectedNote} className="text-red-400 hover:text-red-300 p-1" title="Delete Note (Backspace)">
+                           <TrashIcon />
+                        </button>
+                     )}
+                  </h3>
+                  
+                  {selectedNoteData ? (
+                     <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-3">
+                           <div>
+                              <label className="block text-xs text-gray-500 mb-1">Pitch (MIDI)</label>
+                              <div className="flex items-center space-x-2">
+                                 <input 
+                                    type="number" 
+                                    value={selectedNoteData.pitch}
+                                    onChange={(e) => updateNoteProperty(selectedNote.trackId, selectedNote.noteId, 'pitch', Number(e.target.value))}
+                                    className="w-full bg-gray-900 border border-gray-700 rounded p-1.5 text-sm text-white focus:border-blue-500 focus:outline-none"
+                                 />
+                              </div>
+                              <div className="text-[10px] text-gray-500 mt-0.5">{getPitchName(selectedNoteData.pitch)}</div>
+                           </div>
+                           <div>
+                              <label className="block text-xs text-gray-500 mb-1">Start (Beats)</label>
+                              <input 
+                                 type="number" step="0.25" min="0"
+                                 value={selectedNoteData.start}
+                                 onChange={(e) => updateNoteProperty(selectedNote.trackId, selectedNote.noteId, 'start', Number(e.target.value))}
+                                 className="w-full bg-gray-900 border border-gray-700 rounded p-1.5 text-sm text-white focus:border-blue-500 focus:outline-none"
+                              />
+                           </div>
+                        </div>
+                        
+                        <div>
+                           <label className="block text-xs text-gray-500 mb-1">Duration (Beats)</label>
+                           <input 
+                              type="number" step="0.25" min="0.25"
+                              value={selectedNoteData.duration}
+                              onChange={(e) => updateNoteProperty(selectedNote.trackId, selectedNote.noteId, 'duration', Math.max(0.25, Number(e.target.value)))}
+                              className="w-full bg-gray-900 border border-gray-700 rounded p-1.5 text-sm text-white focus:border-blue-500 focus:outline-none"
+                           />
+                        </div>
+
+                        <div>
+                           <label className="block text-xs text-gray-500 mb-1">Velocity ({Math.round(selectedNoteData.velocity * 100)}%)</label>
+                           <input 
+                              type="range" min="0" max="1" step="0.01" 
+                              value={selectedNoteData.velocity}
+                              onChange={(e) => updateNoteProperty(selectedNote.trackId, selectedNote.noteId, 'velocity', parseFloat(e.target.value))}
+                              className="w-full accent-blue-500"
+                           />
+                        </div>
+                     </div>
+                  ) : (
+                     <div className="text-sm text-gray-500 italic">Select a note to edit properties</div>
+                  )}
+               </div>
+            </div>
+
+          </div>
+          <footer className="h-6 shrink-0 px-4 bg-gray-800 border-t border-gray-700 text-[11px] text-gray-500 flex items-center space-x-5 overflow-x-auto whitespace-nowrap">
+            <span>Space 再生/停止</span><span>V 選択 / P ペン</span><span>ペン: ドラッグで長さ指定</span><span>ノート右端: 長さ変更</span><span>右クリック 削除</span><span>↑↓←→ 移動 (Shift+↑↓=1オクターブ)</span><span>Ctrl+C/V/D コピー・貼付・複製</span><span>Ctrl+Z/Y 取消・やり直し</span><span>ルーラークリック: 再生開始位置</span><span>自動保存</span>
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
 </body>
 </html>
